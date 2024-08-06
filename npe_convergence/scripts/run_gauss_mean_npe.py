@@ -1,7 +1,10 @@
 """Run simple Gauss example."""
 import jax.numpy as jnp
 import jax.random as random
+
 from npe_convergence.examples.gauss import gauss, get_summaries
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
 from flowjax.flows import CouplingFlow  # type: ignore
@@ -18,7 +21,7 @@ def run_gauss_npe():
     loc = jnp.zeros(10)
     loc = jnp.expand_dims(loc, axis=0)
     scale = jnp.eye(10)
-    n_obs = 100
+    n_obs = 500
     true_samples = gauss(key, loc=loc, scale=scale, batch_size=n_obs)
     x_obs = get_summaries(true_samples)
     x_obs = x_obs.ravel()
@@ -27,7 +30,7 @@ def run_gauss_npe():
 
     key, subkey = random.split(key)
     prior_scale = 10 * jnp.eye(10)
-    num_sims = 10_000
+    num_sims = 25_000
     thetas = random.multivariate_normal(key, loc, prior_scale, shape=(num_sims,))
     x = gauss(subkey, loc=thetas, scale=scale, batch_size=n_obs)
     sim_summ_data = get_summaries(x)
@@ -88,6 +91,19 @@ def run_gauss_npe():
         plt.savefig(f't{i}_gauss_npe.pdf')
         plt.clf()
 
+    # TODO: MMD
+    # mmd = unbiased_mmd(posterior_samples, )
+
+    # TODO: KL ... could clean this up, should replace inv w/ solve, fine here - but do this if consider finer precision
+    true_posterior_mean = jnp.linalg.inv(jnp.linalg.inv(prior_scale) + n_obs * jnp.linalg.inv(scale)) @ (jnp.linalg.inv(prior_scale) @ loc.T + n_obs * jnp.linalg.inv(scale) @ x_obs.reshape((-1, 1)))
+    true_posterior_cov = jnp.linalg.inv(jnp.linalg.inv(prior_scale) + n_obs * jnp.linalg.inv(scale))
+
+    true_posterior_samples = random.multivariate_normal(key,
+                                                        true_posterior_mean.ravel(),
+                                                        true_posterior_cov,
+                                                        shape=(num_posterior_samples,))
+    kl = kullback_leibler(true_posterior_samples, posterior_samples)
+    print(f"KL: {kl}")
     # !TODO! DECIDE ON METRIC ... COULD BE MMD
     # TODO: total variation stuff
     # TODO: need CDF of MVN
