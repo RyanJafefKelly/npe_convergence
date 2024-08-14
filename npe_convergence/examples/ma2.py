@@ -5,7 +5,6 @@ import jax.random as random
 import numpyro
 from numpyro import distributions as dist
 
-
 def MA2(t1, t2, n_obs=100, batch_size=1, key=None):
     # TODO: could make faster (e.g. use scan)
     # NOTE: adapted from ELFI
@@ -15,6 +14,7 @@ def MA2(t1, t2, n_obs=100, batch_size=1, key=None):
 
     # i.i.d. sequence ~ N(0,1)
     w = random.normal(key, (batch_size, n_obs + 2))
+    # TODO! DOUBLE CHECK BELOW LINE
     x = w[:, 2:] + t1 * w[:, 1:-1] + t2 * w[:, :-2]
     return x
 
@@ -77,3 +77,30 @@ class CustomPrior_t2:
         locs = jnp.maximum(-a - t1, -a + t1)
         scales = a - locs
         return (x >= locs) & (x <= locs + scales) * (1 / jnp.where(scales > 0, scales, 1))
+
+
+def numpyro_model(var_obs, autocov_obs1, autocov_obs2, a=2, n_obs=100, w_key=None):
+    t1 = numpyro.sample('t1', dist.Uniform(-a, a))
+    locs = jnp.maximum(-a - t1, -a + t1)
+    scales = a - locs
+    t2 = numpyro.sample('t2', dist.Uniform(locs, locs + scales))
+
+    n_key = numpyro.prng_key()
+    sub_key = n_key if n_key is not None else w_key
+
+    w = random.normal(sub_key, (n_obs + 2,))
+    # w = numpyro.sample('w', dist.Normal(0, 1).expand([n_obs + 2]), obs=None)
+    x = w[2:] + t1 * w[1:-1] + t2 * w[:-2]
+
+    var = jnp.var(x)
+    autocov1 = jnp.mean(x[1:] * x[:-1])  # TODO: confirm (could use numpyro.deterministic)
+    autocov2 = jnp.mean(x[2:] * x[:-2])
+    numpyro.deterministic('autocov', jnp.array([autocov1, autocov2]))
+
+    # TODO!!! HOW SET NORMAL VAR FOR EXACT? DOES IT MATTER?
+    variance_scale = 1 / jnp.sqrt(n_obs)  # TODO: CLT / SIMILAR JUSTIFICATION?
+
+    numpyro.sample('obs_var', dist.Normal(var, variance_scale), obs=var_obs)  # TODO: HALF NORMAL OR SOMETHING?
+    numpyro.sample('obs_autocov1', dist.Normal(autocov1, variance_scale), obs=autocov_obs1)
+    numpyro.sample('obs_autocov2', dist.Normal(autocov2, variance_scale), obs=autocov_obs2)
+    return x

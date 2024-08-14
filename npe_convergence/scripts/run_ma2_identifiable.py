@@ -2,41 +2,47 @@ import jax.numpy as jnp
 import jax.random as random
 
 import os
-from npe_convergence.examples.ma2 import MA2, autocov, CustomPrior_t1, CustomPrior_t2
+from npe_convergence.examples.ma2 import MA2, autocov, CustomPrior_t1, CustomPrior_t2, numpyro_model
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
 from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
 from flowjax.flows import CouplingFlow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 import flowjax.bijections as bij
+from jax.scipy.special import logit, expit
+
+from numpyro.infer import MCMC, NUTS
+import numpyro.handlers as handlers
 
 import matplotlib.pyplot as plt
+import pickle as pkl
 
-def run_ma2():
-    # TODO: num sim, n_obs, effects
-    # TODO! TRANSFORM YOUR VARIABLES!!
-    print('t')
+def run_ma2_identifiable(n_obs: int = 100, n_sims: int = 10_000):
+    dirname = "res/ma2_npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     key = random.PRNGKey(0)
-    num_sims = 10_000
     true_params = jnp.array([0.6, 0.2])
-    n_obs = 100
     y_obs = MA2(*true_params, n_obs=n_obs, key=key)
     y_obs = jnp.array([[jnp.var(y_obs)], autocov(y_obs, lag=1), autocov(y_obs, lag=2)]).ravel()
+    
     y_obs_original = y_obs.copy()
 
     # test_t1 = CustomPrior_t1.rvs(2., size=(1,), random_state=10)
     # test_t2 = CustomPrior_t2.rvs(test_t1, 1., size=(1,), random_state=10)
 
     key, sub_key = random.split(key)
-    t1_bounded = CustomPrior_t1.rvs(2., size=(num_sims,), key=sub_key)
+    t1_bounded = CustomPrior_t1.rvs(2., size=(n_sims,), key=sub_key)
     t1 = logit((t1_bounded + 2) / 4)
 
     key, sub_key = random.split(key)
-    t2_bounded = CustomPrior_t2.rvs(t1_bounded, 1., size=(num_sims,), key=sub_key)
+    t2_bounded = CustomPrior_t2.rvs(t1_bounded, 1., size=(n_sims,), key=sub_key)
     t2 = logit((t2_bounded + 1) / 2)
 
     key, sub_key = random.split(key)
-    sim_data = MA2(t1_bounded, t2_bounded, n_obs=n_obs, batch_size=num_sims, key=sub_key)
+    sim_data = MA2(t1_bounded, t2_bounded, n_obs=n_obs, batch_size=n_sims, key=sub_key)
     # sim_summ_data = sim_data
     sim_summ_data = jnp.array((jnp.var(sim_data, axis=1), autocov(sim_data, lag=1), autocov(sim_data, lag=2)))
 
@@ -90,26 +96,42 @@ def run_ma2():
 
     plt.plot(losses['train'], label='train')
     plt.plot(losses['val'], label='val')
-    plt.savefig('losses.pdf')
+    plt.savefig(f'{dirname}losses.pdf')
     plt.clf()
 
     key, sub_key = random.split(key)
 
-    num_ppc_samples = 2_000
-    posterior_samples = flow.sample(sub_key, sample_shape=(num_ppc_samples,), condition=y_obs)
+    num_posterior_samples = 100_000
+
+    nuts_kernel = NUTS(numpyro_model)
+    thinning = 10
+    mcmc = MCMC(nuts_kernel,
+                num_warmup=10_000,
+                num_samples=num_posterior_samples * thinning,
+                thinning=thinning)
+    mcmc.run(random.PRNGKey(1), *y_obs_original, n_obs=n_obs, w_key=sub_key)
+    mcmc.print_summary()
+    samples = mcmc.get_samples()
+    true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
+
+    key, sub_key = random.split(key)
+
+    posterior_samples = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=y_obs)
     posterior_samples = (posterior_samples * thetas_std) + thetas_mean
-    posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
-    posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
-    plt.hist(posterior_samples[:, 0], bins=50)
+    posterior_samples = posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
+    posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+    _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
     # plt.xlim(0, 1)
+    plt.hist(true_posterior_samples[:, 0], bins=bins)
     plt.axvline(true_params[0], color='red')
-    plt.savefig('t1_posterior_identifiable.pdf')
+    plt.savefig(f'{dirname}t1_posterior_identifiable.pdf')
     plt.clf()
 
-    plt.hist(posterior_samples[:, 1], bins=50)
+    _, bins, _ = plt.hist(posterior_samples[:, 1], bins=50)
+    plt.hist(true_posterior_samples[:, 1], bins=bins)
     plt.axvline(true_params[1], color='red')
     # plt.xlim(0, 1)
-    plt.savefig('t2_posterior_identifiable.pdf')
+    plt.savefig(f'{dirname}t2_posterior_identifiable.pdf')
     plt.clf()
 
     resolution = 200
@@ -126,29 +148,37 @@ def run_ma2():
     plt.contourf(xgrid, ygrid, zgrid, levels=50)
     plt.xlim([0, 1])
     plt.ylim([0, 1])
-    plt.savefig('contour_identifiable.pdf')
+    plt.savefig(f'{dirname}contour_identifiable.pdf')
     plt.clf()
 
-    ppc_samples = MA2(posterior_samples[:, 0], posterior_samples[:, 1], n_obs=n_obs, batch_size=num_ppc_samples, key=sub_key)
+    ppc_samples = MA2(posterior_samples[:, 0], posterior_samples[:, 1], n_obs=n_obs, batch_size=num_posterior_samples, key=sub_key)
     ppc_summaries = jnp.array((autocov(ppc_samples, lag=1), autocov(ppc_samples, lag=2)))
     plt.hist(ppc_summaries[0], bins=50)
     plt.axvline(y_obs_original[0], color='red')
-    plt.savefig('ppc_var_identifiable.pdf')
+    plt.savefig(f'{dirname}ppc_var_identifiable.pdf')
     plt.clf()
 
     plt.hist(ppc_summaries[-2], bins=50)
     plt.axvline(y_obs_original[-2], color='red')
-    plt.savefig('ppc_ac1_identifiable.pdf')
+    plt.savefig(f'{dirname}ppc_ac1_identifiable.pdf')
     plt.clf()
 
     plt.hist(ppc_summaries[-1], bins=50)
     plt.axvline(y_obs_original[-1], color='red')
-    plt.savefig('ppc_ac2_identifiable.pdf')
+    plt.savefig(f'{dirname}ppc_ac2_identifiable.pdf')
     plt.clf()
 
-    return
+    kl = kullback_leibler(true_posterior_samples, posterior_samples)
+
+    with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
+        pkl.dump(posterior_samples, f)
+
+    with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
+        pkl.dump(true_posterior_samples, f)
+
+
+    return kl
 
 
 if __name__ == '__main__':
-    print(os.getcwd())
-    run_ma2()
+    run_ma2_identifiable()
