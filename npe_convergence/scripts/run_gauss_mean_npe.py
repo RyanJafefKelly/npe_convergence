@@ -1,6 +1,8 @@
 """Run simple Gauss example."""
 import jax.numpy as jnp
 import jax.random as random
+import os
+import pickle as pkl
 
 from npe_convergence.examples.gauss import gauss, get_summaries
 from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
@@ -13,15 +15,16 @@ import flowjax.bijections as bij
 import matplotlib.pyplot as plt
 
 
-def run_gauss_npe():
-    # TODO
-    # NOTE: prior
-    # TODO: current... 3 dim, unknown mean, identity covariance
+def run_gauss_npe(n_obs: int = 100, n_sims: int = 10_000):
+    """Run Gauss example."""
+    dirname = "res/gauss_npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     key = random.PRNGKey(0)
     loc = jnp.zeros(10)
     loc = jnp.expand_dims(loc, axis=0)
     scale = jnp.eye(10)
-    n_obs = 500
+    # n_obs = 500
     true_samples = gauss(key, loc=loc, scale=scale, batch_size=n_obs)
     x_obs = get_summaries(true_samples)
     x_obs = x_obs.ravel()
@@ -30,8 +33,11 @@ def run_gauss_npe():
 
     key, subkey = random.split(key)
     prior_scale = 10 * jnp.eye(10)
-    num_sims = 25_000
-    thetas = random.multivariate_normal(key, loc, prior_scale, shape=(num_sims,))
+    # n_sims = 25_000
+    thetas = random.multivariate_normal(key, loc, prior_scale, shape=(n_sims,))
+
+    # TODO! BATCH THIS
+
     x = gauss(subkey, loc=thetas, scale=scale, batch_size=n_obs)
     sim_summ_data = get_summaries(x)
 
@@ -70,15 +76,15 @@ def run_gauss_npe():
         learning_rate=5e-4,
         max_epochs=1000,
         max_patience=20,
-        batch_size=256
+        batch_size=128
     )
 
     plt.plot(losses['train'], label='train')
     plt.plot(losses['val'], label='val')
-    plt.savefig('losses.pdf')
+    plt.savefig(f'{dirname}losses.pdf')
     plt.clf()
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 100_000
     posterior_samples = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples * thetas_std) + thetas_mean
     posterior_samples = jnp.squeeze(posterior_samples)
@@ -88,13 +94,10 @@ def run_gauss_npe():
     for i in range(len(x_obs)):
         plt.hist(posterior_samples[:, i], bins=50)
         plt.axvline(0, color='red')
-        plt.savefig(f't{i}_gauss_npe.pdf')
+        plt.savefig(f'{dirname}t{i}_gauss_npe.pdf')
         plt.clf()
 
-    # TODO: MMD
-    # mmd = unbiased_mmd(posterior_samples, )
-
-    # TODO: KL ... could clean this up, should replace inv w/ solve, fine here - but do this if consider finer precision
+    # TODO: KL ... could clean this up, if want more precision here would replace inv w/ solve, fine here - but do this if consider finer precision
     true_posterior_mean = jnp.linalg.inv(jnp.linalg.inv(prior_scale) + n_obs * jnp.linalg.inv(scale)) @ (jnp.linalg.inv(prior_scale) @ loc.T + n_obs * jnp.linalg.inv(scale) @ x_obs.reshape((-1, 1)))
     true_posterior_cov = jnp.linalg.inv(jnp.linalg.inv(prior_scale) + n_obs * jnp.linalg.inv(scale))
 
@@ -103,17 +106,23 @@ def run_gauss_npe():
                                                         true_posterior_cov,
                                                         shape=(num_posterior_samples,))
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
-    print(f"KL: {kl}")
-    # !TODO! DECIDE ON METRIC ... COULD BE MMD
+    # !TODO! DECIDE ON METRIC ... PERHAPS EVEN MMD? Would be easy to implement
     # TODO: total variation stuff
     # TODO: need CDF of MVN
     # can use scipy.stats.multivariate_normal.cdf (or logcdf)
-    # TODO: CDF of NPE samples (this might be an issue)
-    # TODO: grid of points evaluate over
+    # TODO: CDF of NPE samples (this might be an issue)... although built in to flowjax? Alt. CDEs as well.
+    # TODO: grid of points evaluate over? / be smart with evaluation points?
     # TODO: Finally, just get max over grid
 
-    return None
+    with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
+        pkl.dump(posterior_samples, f)
+
+    with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
+        pkl.dump(true_posterior_samples, f)
+
+    return kl
 
 
 if __name__ == '__main__':
+    # TODO? argparser if need
     run_gauss_npe()
