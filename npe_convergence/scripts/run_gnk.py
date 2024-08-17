@@ -4,7 +4,7 @@ import jax.random as random
 import numpy as np
 
 import os
-from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts
+from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts, pgk, gnk_density, gnk_deriv, ss_octile
 from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
@@ -32,26 +32,30 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     true_params = jnp.array([a, b, g, k])
     key = random.PRNGKey(0)
 
+    # TODO! g-and-k density testing
+    densities = gnk_density(jnp.array([0.5]), *true_params)
+
+
 
     # TODO: distribution of summary statistics at true param
-    num_prior_pred_samples = 10_000
-    z = random.normal(key, shape=(num_prior_pred_samples, n_obs))
-    x = gnk(z, *true_params)
-    x = ss_robust(x)
-    x = jnp.squeeze(x)
+    # num_prior_pred_samples = 10_000
+    # z = random.normal(key, shape=(num_prior_pred_samples, n_obs))
+    # x = gnk(z, *true_params)
+    # x = ss_robust(x)
+    # x = jnp.squeeze(x)
 
-    for i in range(4):
-        plt.hist(x[:, i], bins=50)
-        plt.axvline(true_params[i], color='red')
-        plt.savefig(dirname + f"prior_pred_{i}.pdf")
-        plt.clf()
+    # for i in range(4):
+    #     plt.hist(x[:, i], bins=50)
+    #     plt.axvline(true_params[i], color='red')
+    #     plt.savefig(dirname + f"prior_pred_{i}.pdf")
+    #     plt.clf()
 
     key, subkey = random.split(key)
 
     z = random.normal(random.PRNGKey(0), shape=(n_obs,))
     x_obs = gnk(z, *true_params)
     x_obs = jnp.atleast_2d(x_obs)
-    x_obs = ss_robust(x_obs)
+    x_obs = ss_octile(x_obs)
     x_obs = jnp.squeeze(x_obs)
     x_obs_original = x_obs.copy()
     # NOTE: first get true thetas
@@ -62,7 +66,7 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     for ii, param in enumerate(posterior_params):
         plt.hist(true_thetas[param], bins=50, label=param)
         plt.legend()
-        plt.axvline(true_params[ii])
+        plt.axvline(true_params[ii], color='red')
         plt.savefig(dirname + f"true_samples_{param}.pdf")
         plt.clf()
 
@@ -72,13 +76,13 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     thetas_unbounded = logit(thetas_bounded / 10)
 
     # TODO: POOR FOR LOOP
-    x_sims = np.empty((n_sims, 4))
+    x_sims = np.empty((n_sims, 7))
     for ii, theta in enumerate(thetas_bounded):
         key, subkey = random.split(key)
         z = random.normal(subkey, shape=(n_obs,))
         x = gnk(z, *theta)
         x = jnp.atleast_2d(x)
-        x_sims[ii, :] = ss_robust(x).ravel()
+        x_sims[ii, :] = ss_octile(x).ravel()
 
     x_sims = jnp.array(x_sims)
 
@@ -95,7 +99,7 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
 
     key, sub_key = random.split(key)
     theta_dims = 4
-    summary_dims = 4
+    summary_dims = 7
     flow = coupling_flow(
         key=sub_key,
         base_dist=Normal(jnp.zeros(theta_dims)),
