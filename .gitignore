@@ -1,3 +1,10 @@
+# ryan add
+*.pdf
+*.png
+*.pkl
+.DS_Store
+*.mat
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
