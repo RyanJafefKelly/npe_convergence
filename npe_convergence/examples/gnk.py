@@ -12,7 +12,7 @@ from jax import vmap, custom_vjp, grad
 from numpyro.infer import MCMC, NUTS
 from jax.scipy.stats import norm
 from scipy.optimize import root_scalar
-from jaxopt import Broyden, ScipyRootFinding
+# from jaxopt import Broyden, ScipyRootFinding
 from jax.scipy.optimize import minimize
 
 
@@ -154,22 +154,15 @@ def gnk_model(obs, n_obs):
     g = numpyro.sample('g', dist.Uniform(0, 10))
     k = numpyro.sample('k', dist.Uniform(0, 10))
 
-    rng_key = numpyro.prng_key()
-    z = random.normal(rng_key, shape=(n_obs,))
-
-    # Compute the quantile function
-    y = gnk(z, A, B, g, k)
-    y = jnp.atleast_2d(y)
-    y_summ = ss_octile(y)
-    y_summ = jnp.squeeze(y_summ)
+    norm_quantiles = norm.ppf(jnp.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]))
+    expected_summaries = jnp.squeeze(ss_octile(jnp.atleast_2d(gnk(norm_quantiles, A, B, g, k))))  # TODO: UGLY CODE
 
     # Sample y according to the quantile function
     octiles = jnp.linspace(12.5, 87.5, 7) / 100
-    # y = norm.cdf(octiles) # TODO:
-    sample_var_fn = lambda p : p*(1-p)/(n_obs * gnk_density(gnk(norm.ppf(p), A, B, g, k),  A, B, g, k) ** 2)
+    sample_var_fn = lambda p : p*(1-p)/(n_obs * gnk_density(gnk(norm.ppf(p), A, B, g, k),  A, B, g, k) ** 2)  # TODO: UGLY CODE
     y_variance = [sample_var_fn(p) for p in octiles]
-    for i in range(len(octiles)):
-        numpyro.sample(f'y_{i}', dist.Normal(y_summ[i], jnp.sqrt(y_variance[i])), obs=obs[i])
+    for i in range(7):
+        numpyro.sample(f'y_{i}', dist.Normal(expected_summaries[i], jnp.sqrt(y_variance[i])), obs=obs[i])
 
 
 def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
@@ -178,9 +171,9 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     kernel = NUTS(gnk_model)
     thinning = 10
     mcmc = MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples*thinning, thinning=thinning)
-    init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
+    # init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
     mcmc.run(rng_key=rng_key,
-    init_params=init_params,
+    # init_params=init_params,
     obs=obs, n_obs=n_obs)
     mcmc.print_summary()
     return mcmc.get_samples()
