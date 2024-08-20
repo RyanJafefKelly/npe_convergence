@@ -32,32 +32,33 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     true_params = jnp.array([a, b, g, k])
     key = random.PRNGKey(0)
 
-    # TODO! g-and-k density testing
-    densities = gnk_density(jnp.array([0.5]), *true_params)
-
-
-
-    # TODO: distribution of summary statistics at true param
-    # num_prior_pred_samples = 10_000
-    # z = random.normal(key, shape=(num_prior_pred_samples, n_obs))
-    # x = gnk(z, *true_params)
-    # x = ss_robust(x)
-    # x = jnp.squeeze(x)
-
-    # for i in range(4):
-    #     plt.hist(x[:, i], bins=50)
-    #     plt.axvline(true_params[i], color='red')
-    #     plt.savefig(dirname + f"prior_pred_{i}.pdf")
-    #     plt.clf()
-
-    key, subkey = random.split(key)
-
     z = random.normal(random.PRNGKey(0), shape=(n_obs,))
     x_obs = gnk(z, *true_params)
     x_obs = jnp.atleast_2d(x_obs)
     x_obs = ss_octile(x_obs)
     x_obs = jnp.squeeze(x_obs)
     x_obs_original = x_obs.copy()
+
+
+    num_prior_pred_samples = 10_000
+    x = gnk(z, *true_params)
+    # TODO: POOR FOR LOOP
+    x_pred = np.empty((num_prior_pred_samples, 7))
+    for i in range(num_prior_pred_samples):
+        key, subkey = random.split(key)
+        z = random.normal(subkey, shape=(n_obs,))
+        x = gnk(z, *true_params)
+        x = jnp.atleast_2d(x)
+        x_pred[i, :] = ss_octile(x).ravel()
+
+    for i in range(7):
+        plt.hist(x_pred[:, i], bins=50)
+        plt.axvline(x_obs_original[i], color='red')
+        plt.savefig(dirname + f"prior_pred_{i}.pdf")
+        plt.clf()
+
+    key, subkey = random.split(key)
+
     # NOTE: first get true thetas
     true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs)
 
@@ -146,6 +147,12 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
         plt.clf()
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
+
+    with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
+        pkl.dump(posterior_samples, f)
+
+    with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
+        pkl.dump(true_posterior_samples, f)
 
     return kl
 
