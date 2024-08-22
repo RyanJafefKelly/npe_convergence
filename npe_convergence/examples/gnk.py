@@ -171,9 +171,9 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     kernel = NUTS(gnk_model)
     thinning = 10
     mcmc = MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples*thinning, thinning=thinning)
-    # init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
+    init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
     mcmc.run(rng_key=rng_key,
-    # init_params=init_params,
+    init_params=init_params,
     obs=obs, n_obs=n_obs)
     mcmc.print_summary()
     return mcmc.get_samples()
