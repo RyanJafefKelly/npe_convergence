@@ -154,6 +154,9 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
         pkl.dump(true_posterior_samples, f)
 
+    with open(f'{dirname}kl.txt', 'w') as f:
+        f.write(str(kl))
+
     return kl
 
 

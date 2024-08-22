@@ -177,6 +177,8 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
     with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
         pkl.dump(true_posterior_samples, f)
 
+    with open(f'{dirname}kl.txt', 'w') as f:
+        f.write(str(kl))
 
     return kl
 
