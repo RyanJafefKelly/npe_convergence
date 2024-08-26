@@ -154,7 +154,7 @@ def gnk_model(obs, n_obs):
     k = numpyro.sample('k', dist.Uniform(0, 10))
 
     norm_quantiles = norm.ppf(jnp.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]))
-    expected_summaries = jnp.squeeze(ss_octile(jnp.atleast_2d(gnk(norm_quantiles, A, B, g, k))))  # TODO: UGLY CODE
+    expected_summaries = gnk(norm_quantiles, A, B, g, k)  # TODO: UGLY CODE
 
     # Sample y according to the quantile function
     octiles = jnp.linspace(12.5, 87.5, 7) / 100
