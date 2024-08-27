@@ -5,7 +5,7 @@ import numpy as np
 
 import os
 from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts, pgk, gnk_density, gnk_deriv, ss_octile
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd_optimised
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
@@ -144,6 +144,10 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
+    mmd = unbiased_mmd_optimised(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+
+
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
@@ -153,7 +157,10 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))
 
-    return kl
+    with open(f'{dirname}mmd.txt', 'w') as f:
+        f.write(str(mmd))
+
+    return kl, mmd
 
 
 if __name__ == "__main__":

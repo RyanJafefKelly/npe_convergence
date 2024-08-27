@@ -1,3 +1,6 @@
+"""Run MA of order k model."""
+
+import argparse
 import jax
 import jax.numpy as jnp
 import jax.random as random
@@ -5,7 +8,7 @@ import numpy as np
 
 import os
 from npe_convergence.examples.mak import MAK, get_summaries, numpyro_model, generate_valid_samples, is_valid_sample, log_prob
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic, unbiased_mmd_optimised
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
@@ -25,8 +28,8 @@ import pickle as pkl
 import arviz as az
 
 
-def run_mak(n_obs: int = 1000, n_sims: int = 100_000):
-    dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
+def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
+    dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
@@ -43,7 +46,7 @@ def run_mak(n_obs: int = 1000, n_sims: int = 100_000):
     print("y_obs: ", y_obs)
     y_obs_original = y_obs.copy()
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 1_000
     # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)
     thinning = 10
@@ -51,7 +54,7 @@ def run_mak(n_obs: int = 1000, n_sims: int = 100_000):
     num_chains = 2 * ma_order
     mcmc = MCMC(ess_kernel,
                 num_warmup=10_000,
-                num_samples=num_posterior_samples * thinning,
+                num_samples=num_posterior_samples * thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
                 chain_method='vectorized')
@@ -148,16 +151,34 @@ def run_mak(n_obs: int = 1000, n_sims: int = 100_000):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
+    mmd = unbiased_mmd_optimised(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
     with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
         pkl.dump(true_posterior_samples, f)
 
+    with open(f'{dirname}kl.txt', 'w') as f:
+        f.write(str(kl))
 
-    return kl
+    with open(f'{dirname}mmd.txt', 'w') as f:
+        f.write(str(mmd))
+
+
+    return kl, mmd
 
 
 if __name__ == "__main__":
     numpyro.set_host_device_count(4)
-    run_mak()
+    parser = argparse.ArgumentParser(
+        prog="run_mak.py",
+        description="Run MA of order k model.",
+        epilog="Example usage: python run_mak.py"
+    )
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n_obs", type=int, default=500)
+    parser.add_argument("--n_sims", type=int, default=10_000)
+    args = parser.parse_args()
+    run_mak(args)
