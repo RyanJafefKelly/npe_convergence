@@ -64,12 +64,7 @@ def _get_ss_k(y):
 
 def ss_octile(y):
     octiles = jnp.linspace(12.5, 87.5, 7)
-    E1, E2, E3, E4, E5, E6, E7 = jnp.percentile(y, octiles, axis=1)
-
-    # Combining the summary statistics.
-    ss_octile = jnp.hstack((E1, E2, E3, E4, E5, E6, E7))
-    # ss_octile = ss_octile[:, :, jnp.newaxis]
-    return ss_octile
+    return jnp.percentile(y, octiles, axis=-1)
 
 
 def gnk_density(x, A, B, g, k, c=0.8):
@@ -169,7 +164,12 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     rng_key = random.PRNGKey(seed)
     kernel = NUTS(gnk_model)
     thinning = 10
-    mcmc = MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples*thinning, thinning=thinning)
+    num_chains = 4
+    mcmc = MCMC(kernel,
+                num_warmup=num_warmup,
+                num_samples=num_samples*thinning // num_chains,
+                thinning=thinning,
+                num_chains=num_chains)
     init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
     mcmc.run(rng_key=rng_key,
     init_params=init_params,  # NOTE: just cheat, want to be sampling exactly anyway
