@@ -5,7 +5,7 @@ import numpy as np
 
 import os
 from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts, pgk, gnk_density, gnk_deriv, ss_octile
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd_optimised
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
@@ -15,6 +15,7 @@ from flowjax.train.data_fit import fit_to_data  # type: ignore
 import flowjax.bijections as bij
 from jax.scipy.special import logit, expit
 
+import numpyro
 from numpyro.infer import MCMC, NUTS
 import numpyro.handlers as handlers
 import numpyro.distributions as dist
@@ -23,7 +24,7 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 
 
-def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
+def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -76,14 +77,10 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     thetas_bounded = dist.Uniform(0, 10).sample(subkey, (n_sims, 4))
     thetas_unbounded = logit(thetas_bounded / 10)
 
-    # TODO: POOR FOR LOOP
-    x_sims = np.empty((n_sims, 7))
-    for ii, theta in enumerate(thetas_bounded):
-        key, subkey = random.split(key)
-        z = random.normal(subkey, shape=(n_obs,))
-        x = gnk(z, *theta)
-        x = jnp.atleast_2d(x)
-        x_sims[ii, :] = ss_octile(x).ravel()
+    A, B, g, k = thetas_bounded.T
+    x = gnk(z, A[:, None], B[:, None], g[:, None], k[:, None])
+
+    x_sims = ss_octile(x)
 
     x_sims = jnp.array(x_sims)
 
@@ -91,8 +88,7 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     thetas_std = thetas_unbounded.std(axis=0)
     thetas = (thetas_unbounded - thetas_mean) / thetas_std
 
-    # sim_summ_data = x_sims.T
-    sim_summ_data = x_sims  # TODO
+    sim_summ_data = x_sims.T  # TODO? ugly to do this
     sim_summ_data_mean = sim_summ_data.mean(axis=0)
     sim_summ_data_std = sim_summ_data.std(axis=0)
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
@@ -118,9 +114,9 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
         dist=flow,
         x=thetas,
         condition=sim_summ_data,
-        learning_rate=5e-5,  # TODO: could experiment with
+        learning_rate=5e-4,  # TODO: could experiment with
         max_epochs=2000,
-        max_patience=20,
+        max_patience=10,
         batch_size=256,
     )
 
@@ -148,6 +144,10 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
+    mmd = unbiased_mmd_optimised(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+
+
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
@@ -157,8 +157,21 @@ def run_gnk(n_obs: int = 1_000, n_sims: int = 100_000):
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))
 
-    return kl
+    with open(f'{dirname}mmd.txt', 'w') as f:
+        f.write(str(mmd))
+
+    return kl, mmd
 
 
 if __name__ == "__main__":
-    run_gnk()
+    numpyro.set_host_device_count(4)
+    parser = argparse.ArgumentParser(
+        prog="run_gnk.py",
+        description="Run gnk model.",
+        epilog="Example usage: python run_gnk.py"
+    )
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n_obs", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=10_000)
+    args = parser.parse_args()
+    run_gnk(args)

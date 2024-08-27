@@ -2,24 +2,27 @@ import jax.numpy as jnp
 import numpy as np
 import math
 
-def run_experiment(experiment_fn):
+def run_experiment(experiment_fn, seed: int = 0):
     n_obs = [100, 500, 1000, 5000]
 
     n_sims = [lambda n : n, lambda n: int(n * math.log(n)), lambda n : int(n ** (3/2)), lambda n : n ** 2]
 
     kl_mat = np.zeros((len(n_obs), len(n_sims)))
+    mmd_mat = np.zeros((len(n_obs), len(n_sims)))
 
-    for ii, n in enumerate(n_obs):
-        for jj, f in enumerate(n_sims):
+    for jj, n in enumerate(n_sims):
+        for ii, f in enumerate(n_obs):
             try:
-                kl = experiment_fn(n, f(n))
+                kl, mmd = experiment_fn(seed, n, f(n))
             except ValueError as e:
                 kl = None
+                mmd = None
                 print(f"Error: {e}")
-            print(f"n_obs: {n}, n_sims: {f(n)}, kl: {kl}")
+            print(f"n_obs: {n}, n_sims: {f(n)}, kl: {kl}, mmd: {mmd}")
             kl_mat[ii, jj] = kl
+            mmd_mat[ii, jj] = mmd
 
-    return kl_mat
+    return None
 
 if __name__ == "__main__":
     run_experiment()
