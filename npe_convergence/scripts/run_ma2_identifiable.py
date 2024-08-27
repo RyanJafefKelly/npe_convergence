@@ -46,9 +46,9 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
     num_posterior_samples = 100_000
 
     nuts_kernel = NUTS(numpyro_model)
-    thinning = 1
+    thinning = 10
     mcmc = MCMC(nuts_kernel,
-                num_warmup=1_000,
+                num_warmup=2_000,
                 num_samples=num_posterior_samples * thinning,
                 thinning=thinning)
     mcmc.run(random.PRNGKey(1), y_obs_original, n_obs=n_obs)
