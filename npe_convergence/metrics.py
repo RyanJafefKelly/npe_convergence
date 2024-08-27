@@ -34,7 +34,7 @@ def unbiased_mmd(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
     return mmd_value
 
 
-def unbiased_mmd_optimized(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
+def unbiased_mmd_optimised(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
     # TODO! GO THROUGH THIS - CHECK LEGIT
     m = npe_posterior_samples.shape[0]
     n = exact_posterior_samples.shape[0]
