@@ -28,7 +28,7 @@ import pickle as pkl
 
 
 def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 10_000):
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
+    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)

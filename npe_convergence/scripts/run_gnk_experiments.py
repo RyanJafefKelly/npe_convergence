@@ -3,7 +3,8 @@ from npe_convergence.scripts.run_experiment import run_experiment
 from npe_convergence.scripts.run_gnk import run_gnk
 
 
-def run_gnk_experiments(seed: int = 0):
+def run_gnk_experiments(args):
+    seed = args.seed
     kl_mat = run_experiment(run_gnk, seed)
     return None
 
