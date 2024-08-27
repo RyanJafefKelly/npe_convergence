@@ -9,10 +9,27 @@ def rbf_kernel(x, y, lengthscale=1.0):
     return jnp.exp(-jnp.sum((x - y) ** 2) / (2 * lengthscale ** 2))
 
 
-def median_heuristic(x):
-    """median distance between points in the aggregate sample."""
-    pairwise_dists = jnp.sqrt(jnp.sum((x[:, None, :] - x[None, :, :]) ** 2, axis=-1))
-    return jnp.sqrt(jnp.median(pairwise_dists) / 2)
+# def median_heuristic(x):
+#     """median distance between points in the aggregate sample."""
+#     pairwise_dists = jnp.sqrt(jnp.sum((x[:, None, :] - x[None, :, :]) ** 2, axis=-1))
+#     return jnp.sqrt(jnp.median(pairwise_dists) / 2)
+
+
+def median_heuristic(x, batch_size=1000):
+    """Compute median heuristic using a batched approach to save memory."""
+    n = x.shape[0]
+    
+    def batch_distances(i):
+        start = i * batch_size
+        end = min((i + 1) * batch_size, n)
+        batch = x[start:end]
+        dists = jnp.sqrt(jnp.sum((batch[:, None, :] - x[None, :, :]) ** 2, axis=-1))
+        return dists.ravel()
+
+    num_batches = (n + batch_size - 1) // batch_size
+    all_dists = jnp.concatenate([batch_distances(i) for i in range(num_batches)])
+    
+    return jnp.sqrt(jnp.median(all_dists) / 2)  # NOTE: can need a bit of memory for this step
 
 
 # TODO: confirm?
@@ -34,7 +51,7 @@ def unbiased_mmd(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
     return mmd_value
 
 
-def unbiased_mmd_optimised(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
+def unbiased_mmd(npe_posterior_samples, exact_posterior_samples, lengthscale=1):
     # TODO! GO THROUGH THIS - CHECK LEGIT
     m = npe_posterior_samples.shape[0]
     n = exact_posterior_samples.shape[0]

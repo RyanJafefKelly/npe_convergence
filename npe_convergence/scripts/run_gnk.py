@@ -1,3 +1,6 @@
+"""Run gnk model."""
+
+import argparse
 import jax
 import jax.numpy as jnp
 import jax.random as random
@@ -5,7 +8,7 @@ import numpy as np
 
 import os
 from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts, pgk, gnk_density, gnk_deriv, ss_octile
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd_optimised
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
@@ -24,7 +27,7 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 
 
-def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
+def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 10_000):
     dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -39,8 +42,9 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     x_obs = ss_octile(x_obs)
     x_obs = jnp.squeeze(x_obs)
     x_obs_original = x_obs.copy()
+    print("x_obs: ", x_obs)
 
-
+    num_posterior_samples = 10_000  # TODO! SEE WHAT CAN DO HERE WITH MMD
     num_prior_pred_samples = 10_000
     x = gnk(z, *true_params)
     # TODO: POOR FOR LOOP
@@ -61,7 +65,7 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs)
+    true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples)
 
 
     posterior_params = ['A', 'B', 'g', 'k']
@@ -126,7 +130,6 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     plt.clf()
     key, sub_key = random.split(key)
 
-    num_posterior_samples = 10_000
     posterior_samples = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples * thetas_std) + thetas_mean
     posterior_samples = expit(posterior_samples) * 10
@@ -145,7 +148,7 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 100_000):
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
-    mmd = unbiased_mmd_optimised(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
 
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:

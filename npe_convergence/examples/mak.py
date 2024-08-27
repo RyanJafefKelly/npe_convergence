@@ -106,8 +106,10 @@ class MAIdentifiablePrior(Distribution):
 
     def sample(self, key, sample_shape=()):
         samples = []
+        print('key: ', key)
         while len(samples) < np.prod(sample_shape):
-            theta = generate_sample(self.k, self.intervals)
+            print('c')
+            theta = generate_sample(key, self.k, self.intervals)
             if is_valid_sample(theta):
                 samples.append(theta)
         return jnp.array(samples).reshape(sample_shape + (self.k,))
@@ -122,13 +124,14 @@ class MAIdentifiablePrior(Distribution):
         # Use jnp.where to conditionally assign log probability
         return jnp.where(valid, log_prob_uniform, -jnp.inf)
 
-def generate_sample(k, intervals=None):
+def generate_sample(key, k, intervals=None):
     """Generate a sample of theta parameters for an MA(k) model."""
     # Generate random theta values, for example, in the range [-2, 2]
     if intervals is None:
         intervals = [1] * k
-    return np.array([np.random.uniform(-a, a) for a in intervals])
-
+    keys = random.split(key, len(intervals))
+    samples = jnp.array([random.uniform(k, minval=-a, maxval=a) for k, a in zip(keys, intervals)])
+    return samples
 
 def is_valid_sample(theta):
     """Check if the sample is valid (all roots outside the unit circle)."""
@@ -140,13 +143,14 @@ def is_valid_sample(theta):
     roots = jnp.roots(jnp.array(coeffs), strip_zeros=False)
     return jnp.all(jnp.abs(roots) > 1)
 
-def generate_valid_samples(k, intervals=None, num_samples=1000):
+def generate_valid_samples(key, k, intervals=None, num_samples=1000):
     # TODO! KEY
     """Generate valid samples for an MA(k) model using rejection sampling."""
     valid_samples = []
     count = 0
     while len(valid_samples) < num_samples:
-        theta = generate_sample(k, intervals=intervals)
+        key, sub_key = random.split(key)
+        theta = generate_sample(sub_key, k, intervals=intervals)
         count += 1
         if is_valid_sample(theta):
             valid_samples.append(theta)

@@ -170,7 +170,12 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
                 num_samples=num_samples*thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains)
-    init_params = {'A': 3.0, 'B': 1.0, 'g': 2.0, 'k': 0.5}
+    init_params = {
+        'A': jnp.repeat(jnp.array([3.0]), num_chains),
+        'B': jnp.repeat(jnp.array([1.0]), num_chains),
+        'g': jnp.repeat(jnp.array([2.0]), num_chains),
+        'k': jnp.repeat(jnp.array([0.5]), num_chains)
+    }
     mcmc.run(rng_key=rng_key,
     init_params=init_params,  # NOTE: just cheat, want to be sampling exactly anyway
     obs=obs, n_obs=n_obs)

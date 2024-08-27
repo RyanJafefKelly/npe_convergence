@@ -10,9 +10,11 @@ import numpyro.contrib.control_flow
 import numpyro.distributions as dist
 
 PAIRS = ([0, 5], [3, 1], [4, 2])
+# indices = ([0, 5], ...)  # TODO? neater or weird?
 
 
 def svar(key, theta, n_obs=1_000):
+    n_obs=100_000  # TODO! EXPERIMENT
     k = theta.shape[-1] - 1  # dimension of VAR, last element is sigma
 
     # Initialising transition matrix X
@@ -57,9 +59,9 @@ def compute_summaries(Y):
     return S
 
 
-def expected_autocovariance(X, theta, sigma):
-    autocovariance = sigma**2 * X
-    return autocovariance
+# def expected_autocovariance(X, theta, sigma):
+#     autocovariance = sigma**2 * X  # TODO! WRONG I THINK
+#     return autocovariance
 
 
 def get_model(obs, n_obs):
@@ -72,7 +74,6 @@ def get_model(obs, n_obs):
 
     theta_dims = 6  # TODO! MAGIC
     theta = numpyro.sample("theta", dist.Uniform(-.9, 0.9).expand([theta_dims]))
-
 
     sigma = numpyro.sample("sigma", dist.Uniform(0, 1))
 
@@ -91,6 +92,7 @@ def get_model(obs, n_obs):
     X = X.at[indices].set(theta)
     expected_autocov = sigma**2 * (jnp.matmul(X, X.T) + jnp.eye(k))  # TODO! UNSURE ABOUT
     expected_autocov_vector = expected_autocov[indices]
+    numpyro.deterministic("expected_autocov", expected_autocov_vector)
 
     # TODO: for loop
     # series = jnp.zeros((n_obs + 1, k))

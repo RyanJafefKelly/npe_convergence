@@ -9,7 +9,7 @@ from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
 from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
-from flowjax.flows import CouplingFlow  # type: ignore
+from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 import flowjax.bijections as bij
 from jax.scipy.special import logit, expit
@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 
 
-def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
+def run_svar(n_obs: int = 100, n_sims: int = 1_000):
     dirname = "res/svar/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -30,7 +30,7 @@ def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
     key = random.PRNGKey(1)
     true_params = jnp.array([0.579, -0.143, 0.836, 0.745, -0.660, -0.254, 0.1])
     # true_params = jnp.atleast_2d(true_params)
-    y_obs = svar(key, true_params)
+    y_obs = svar(key, true_params, n_obs=n_obs)
     y_obs_original = y_obs.copy()
     for i in range(6):
         plt.plot(y_obs[:, i])
@@ -40,6 +40,7 @@ def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
     key, sub_key = random.split(key)
     true_samples = run_inference(y_obs, n_obs, sub_key)
     true_thetas = true_samples['theta']
+    # true_sigma = true_samples['sigma']  # TODO! NEED TO USE?
     # plot marginal posteriors
     # for i in range(6):
     #     plt.hist(true_thetas[:, i], bins=50)
@@ -56,12 +57,19 @@ def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
     thetas_unbounded = jnp.hstack([thetas_unbounded, sigma_unbounded])
 
     key, sub_key = random.split(key)
-    svar_vmap = jax.vmap(svar, in_axes=(None, 0))
-    x_sims = svar_vmap(sub_key, thetas)
-    x_sims = jax.vmap(compute_summaries)(x_sims)
+    # TODO: LAZY, annoying batch, TODO! CLEAN
+    x_sims = jnp.empty((n_sims, 7))
+    for i in range(n_sims):
+        print(i)
+        y = svar(sub_key, thetas[i, :], n_obs=n_obs)
+        y = compute_summaries(jnp.atleast_2d(y))
+        x_sims = x_sims.at[i, :].set(y)
+    # svar_vmap = jax.vmap(svar, in_axes=(None, 0))
+    # x_sims = svar_vmap(sub_key, thetas)
+    # x_sims = jax.vmap(compute_summaries)(x_sims)
     # thetas = jnp
     # transform using logit to unbounded space
-    thetas_unbounded = thetas_unbounded
+    # thetas_unbounded = thetas_unbounded
     thetas_mean = thetas_unbounded.mean(axis=0)
     thetas_std = thetas_unbounded.std(axis=0)
     thetas = (thetas_unbounded - thetas_mean) / thetas_std
@@ -78,7 +86,7 @@ def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
     key, sub_key = random.split(sub_key)
     theta_dims = 7
     summary_dims = 7
-    flow = CouplingFlow(
+    flow = coupling_flow(
         key=sub_key,
         base_dist=Normal(jnp.zeros(theta_dims)),
         # base_dist=Uniform(minval=-3 * jnp.ones(theta_dims), maxval=3 * jnp.ones(theta_dims)),
@@ -114,12 +122,14 @@ def run_svar(n_obs: int = 1_000, n_sims: int = 10_000):
     posterior_samples = posterior_samples.at[:, :6].set( 1.8 * expit(posterior_samples[:, :6]) - 0.9)
     posterior_samples = posterior_samples.at[:, -1].set(expit(posterior_samples[:, -1]))
     # plt.xlim(0, 1)
+    true_thetas = true_thetas.T  # TODO: ugly
     for i in range(7):
-        plt.clf()
-        _, bins, _ = plt.hist(true_thetas[:, i], bins=50, label='true')
-        plt.hist(posterior_samples[:, i], bins=bins, label='NPE')
+        _, bins, _ = plt.hist(true_thetas[:, i], bins=50, alpha=0.8, label='true')
+        plt.hist(posterior_samples[:, i], bins=bins, alpha=0.8, label='NPE')
         plt.legend()
+        plt.axvline(true_params[i], color='black')
         plt.savefig(f'{dirname}posterior_samples_{i}.pdf')
+        plt.clf()
 
     # TODO: get samples
     return None

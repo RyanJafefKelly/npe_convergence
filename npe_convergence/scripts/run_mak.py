@@ -8,7 +8,7 @@ import numpy as np
 
 import os
 from npe_convergence.examples.mak import MAK, get_summaries, numpyro_model, generate_valid_samples, is_valid_sample, log_prob
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic, unbiased_mmd_optimised
+from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic, unbiased_mmd
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 import flowjax.bijections as bij
@@ -30,23 +30,25 @@ import arviz as az
 
 def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
     dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    print("Running MA of order k model with seed: ", seed)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
     key = random.PRNGKey(0)
     ma_order = 10
     # true_params = random.uniform(key, (ma_order,), minval=-1, maxval=1)
-    true_params = generate_valid_samples(ma_order, num_samples=1)
+    true_params = generate_valid_samples(key, ma_order, num_samples=1)
     t_bool = is_valid_sample(true_params)
     l_prob = log_prob(true_params, k=1.0, a=1.0)
     true_params = true_params.ravel()
     print("true_params: ", true_params)
-    y_obs = MAK(true_params, n_obs=n_obs, key=key)
+    key, sub_key = random.split(key)
+    y_obs = MAK(true_params, n_obs=n_obs, key=sub_key)
     y_obs = get_summaries(y_obs, ma_order)
     print("y_obs: ", y_obs)
     y_obs_original = y_obs.copy()
 
-    num_posterior_samples = 1_000
+    num_posterior_samples = 10_000
     # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)
     thinning = 10
@@ -152,7 +154,7 @@ def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
-    mmd = unbiased_mmd_optimised(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)

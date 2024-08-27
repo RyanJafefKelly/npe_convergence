@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import numpy as np
 import math
+import numpyro
 
 def run_experiment(experiment_fn, seed: int = 0):
     n_obs = [100, 500, 1000, 5000]
@@ -10,8 +11,8 @@ def run_experiment(experiment_fn, seed: int = 0):
     kl_mat = np.zeros((len(n_obs), len(n_sims)))
     mmd_mat = np.zeros((len(n_obs), len(n_sims)))
 
-    for jj, n in enumerate(n_sims):
-        for ii, f in enumerate(n_obs):
+    for jj, f in enumerate(n_sims):
+        for ii, n in enumerate(n_obs):
             try:
                 kl, mmd = experiment_fn(seed, n, f(n))
             except ValueError as e:
