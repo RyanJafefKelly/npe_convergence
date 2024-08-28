@@ -25,8 +25,14 @@ import arviz as az
     
 
 
-def run_gnk(args):
-    seed, n_obs, n_sims = args.seed, args.n_obs, args.n_sims
+def run_gnk(*args, **kwargs):
+    try:
+        seed, n_obs, n_sims = args
+    except ValueError:
+        args = args[0]
+        seed = args.seed
+        n_obs = args.n_obs
+        n_sims = args.n_sims
     dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
