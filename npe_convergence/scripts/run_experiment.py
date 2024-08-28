@@ -3,7 +3,7 @@ import numpy as np
 import math
 import numpyro
 
-def run_experiment(experiment_fn, seed: int = 0):
+def run_experiment(experiment_fn, seed: int = 0, **kwargs):
     n_obs = [100, 500, 1000, 5000]
 
     n_sims = [lambda n : n, lambda n: int(n * math.log(n)), lambda n : int(n ** (3/2)), lambda n : n ** 2]
@@ -14,7 +14,7 @@ def run_experiment(experiment_fn, seed: int = 0):
     for jj, f in enumerate(n_sims):
         for ii, n in enumerate(n_obs):
             try:
-                kl, mmd = experiment_fn(seed, n, f(n))
+                kl, mmd = experiment_fn(seed, n, f(n), **kwargs)
             except ValueError as e:
                 kl = None
                 mmd = None
