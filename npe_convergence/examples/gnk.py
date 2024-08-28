@@ -9,11 +9,13 @@ import numpy as np
 
 from jax import vmap, custom_vjp, grad
 
-from numpyro.infer import MCMC, NUTS
+from numpyro.infer import MCMC, NUTS, ESS, AIES
 from jax.scipy.stats import norm
 from scipy.optimize import root_scalar
 from jax.scipy.optimize import minimize
-
+import arviz as az
+import matplotlib.pyplot as plt
+from jax.scipy.special import logit, expit
 
 def gnk(z, A, B, g, k, c=0.8):
     """Quantile function for the g-and-k distribution."""
@@ -53,6 +55,7 @@ def _get_ss_g(y):
     ss_B = _get_ss_B(y).flatten()  # Flatten since we need to use it for division.
     ss_g = (L3 + L1 - 2 * L2) / ss_B
     return ss_g[:, None]
+
 
 def _get_ss_k(y):
     """Compute a kurtosis-like summary statistic."""
@@ -108,7 +111,7 @@ def z2gk(p, A, B, g, k, c=0.8):
 
 
 def bisection_method(f, a, b, tol=1e-5, max_iter=100):
-    fa, fb = f(a), f(b)
+    fa = f(a)
     c = a
     for _ in range(max_iter):
         c = (a + b) / 2
@@ -141,6 +144,11 @@ def pgk_scalar(q, A, B, g, k, c=0.8, zscale=False):
         return norm.cdf(z)
 
 
+def sample_var_fn(p, A, B, g, k, n_obs):
+    res = (p*(1-p))/(n_obs * gnk_density(gnk(norm.ppf(p), A, B, g, k),  A, B, g, k) ** 2)
+    return res
+
+
 def gnk_model(obs, n_obs):
     """Model for the g-and-k distribution using Numpyro."""
     A = numpyro.sample('A', dist.Uniform(0, 10))
@@ -148,13 +156,11 @@ def gnk_model(obs, n_obs):
     g = numpyro.sample('g', dist.Uniform(0, 10))
     k = numpyro.sample('k', dist.Uniform(0, 10))
 
-    norm_quantiles = norm.ppf(jnp.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]))
-    expected_summaries = gnk(norm_quantiles, A, B, g, k)  # TODO: UGLY CODE
-
-    # Sample y according to the quantile function
     octiles = jnp.linspace(12.5, 87.5, 7) / 100
-    sample_var_fn = lambda p : p*(1-p)/(n_obs * gnk_density(gnk(norm.ppf(p), A, B, g, k),  A, B, g, k) ** 2)  # TODO: UGLY CODE
-    y_variance = [sample_var_fn(p) for p in octiles]
+    norm_quantiles = norm.ppf(octiles)
+    expected_summaries = gnk(norm_quantiles, A, B, g, k)
+
+    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
     for i in range(7):
         numpyro.sample(f'y_{i}', dist.Normal(expected_summaries[i], jnp.sqrt(y_variance[i])), obs=obs[i])
 
@@ -163,21 +169,64 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     """Run the NUTS sampler."""
     rng_key = random.PRNGKey(seed)
     kernel = NUTS(gnk_model)
-    thinning = 10
+    aies_kernel = AIES(gnk_model, moves={AIES.DEMove() : 0.5,
+                           AIES.StretchMove() : 0.5},
+                    #    init_strategy='init_to_value'
+                       )
+    thinning = 1
+    # num_chains = 2 * len(obs)
     num_chains = 4
+
+    A = jnp.array([3.0])
+    B = jnp.array([1.0])
+    B2 = jnp.array([0.39])
+    g = jnp.array([2.0])
+    k = jnp.array([0.5])
+    k2 = jnp.array([9.9])
+
+    norm_quantiles = norm.ppf(jnp.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]))
+    expected_summaries = gnk(norm_quantiles, A, B, g, k)  # TODO: UGLY CODE
+    expected_summaries2 = gnk(norm_quantiles, A, B2, g, k2)  # TODO: UGLY CODE
+
+    # Sample y according to the quantile function
+    octiles = jnp.linspace(12.5, 87.5, 7) / 100
+    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
+    y_variance2 = [sample_var_fn(p, A, B2, g, k2, n_obs) for p in octiles]
+    y_stdev = [jnp.sqrt(var) for var in y_variance]
+    y_stdev2 = [jnp.sqrt(var) for var in y_variance2]
+
+    diff = obs - expected_summaries
+    diff_norm = [diff[i] / y_stdev[i] for i in range(7)]
+    diff2 = obs - expected_summaries2
+    diff_norm2 = [diff2[i] / y_stdev2[i] for i in range(7)]
+
     mcmc = MCMC(kernel,
                 num_warmup=num_warmup,
                 num_samples=num_samples*thinning // num_chains,
                 thinning=thinning,
-                num_chains=num_chains)
+                num_chains=num_chains,
+                # chain_method='vectorized'
+                )
     init_params = {
-        'A': jnp.repeat(jnp.array([3.0]), num_chains),
-        'B': jnp.repeat(jnp.array([1.0]), num_chains),
-        'g': jnp.repeat(jnp.array([2.0]), num_chains),
-        'k': jnp.repeat(jnp.array([0.5]), num_chains)
+        'A': jnp.repeat(logit(jnp.array([3.0])/10), num_chains),
+        'B': jnp.repeat(logit(jnp.array([1.0])/10), num_chains),
+        'g': jnp.repeat(logit(jnp.array([2.0])/10), num_chains),
+        'k': jnp.repeat(logit(jnp.array([0.5])/10), num_chains)
     }
     mcmc.run(rng_key=rng_key,
     init_params=init_params,  # NOTE: just cheat, want to be sampling exactly anyway
     obs=obs, n_obs=n_obs)
     mcmc.print_summary()
+    inference_data = az.from_numpyro(mcmc)
+    dirname = ""
+    az.plot_trace(inference_data, compact=False)
+    plt.savefig(f"{dirname}traceplots.png")
+    plt.close()
+    az.plot_ess(inference_data, kind="evolution")
+    plt.savefig(f"{dirname}ess_plots.png")
+    plt.close()
+    az.plot_autocorr(inference_data)
+    plt.savefig(f"{dirname}autocorr.png")
+    plt.close()
+
     return mcmc.get_samples()

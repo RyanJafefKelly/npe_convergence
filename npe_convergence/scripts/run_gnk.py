@@ -1,43 +1,50 @@
 """Run gnk model."""
 
 import argparse
-import jax
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
 
 import os
-from npe_convergence.examples.gnk import gnk, ss_robust, run_nuts, pgk, gnk_density, gnk_deriv, ss_octile
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic
+from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile
+from npe_convergence.metrics import kullback_leibler, unbiased_mmd, median_heuristic
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-import flowjax.bijections as bij
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
 from jax.scipy.special import logit, expit
 
-import numpyro
-from numpyro.infer import MCMC, NUTS
-import numpyro.handlers as handlers
-import numpyro.distributions as dist
+import numpyro  # type: ignore
+import numpyro.distributions as dist  # type: ignore
 
 import matplotlib.pyplot as plt
 import pickle as pkl
+import arviz as az
+
+    
 
 
-def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 10_000):
+def run_gnk(args):
+    seed, n_obs, n_sims = args.seed, args.n_obs, args.n_sims
     dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
     a, b, g, k = 3.0, 1.0, 2.0, 0.5
     true_params = jnp.array([a, b, g, k])
-    key = random.PRNGKey(0)
+    key = random.PRNGKey(seed)
 
-    z = random.normal(random.PRNGKey(0), shape=(n_obs,))
+    z = random.normal(key, shape=(n_obs,))
+    plt.hist(z.ravel(), bins=50)
+    # plt.show()
+    plt.savefig(dirname + "z.pdf")
+    plt.clf()
     x_obs = gnk(z, *true_params)
+    plt.hist(x_obs, bins=50)
+    # plt.show()
+    plt.savefig(dirname + "x_obs.pdf")
+    plt.clf()
     x_obs = jnp.atleast_2d(x_obs)
     x_obs = ss_octile(x_obs)
     x_obs = jnp.squeeze(x_obs)
@@ -45,28 +52,30 @@ def run_gnk(seed: int = 0, n_obs: int = 1_000, n_sims: int = 10_000):
     print("x_obs: ", x_obs)
 
     num_posterior_samples = 10_000  # TODO! SEE WHAT CAN DO HERE WITH MMD
-    num_prior_pred_samples = 10_000
-    x = gnk(z, *true_params)
+    # num_prior_pred_samples = 10_000
+    # x = gnk(z, *true_params)
     # TODO: POOR FOR LOOP
-    x_pred = np.empty((num_prior_pred_samples, 7))
-    for i in range(num_prior_pred_samples):
-        key, subkey = random.split(key)
-        z = random.normal(subkey, shape=(n_obs,))
-        x = gnk(z, *true_params)
-        x = jnp.atleast_2d(x)
-        x_pred[i, :] = ss_octile(x).ravel()
+    # x_pred = np.empty((num_prior_pred_samples, 7))
+    # for i in range(num_prior_pred_samples):
+    #     key, subkey = random.split(key)
+    #     z = random.normal(subkey, shape=(n_obs,))
+    #     x = gnk(z, *true_params)
+    #     x = jnp.atleast_2d(x)
+    #     x_pred[i, :] = ss_octile(x).ravel()
 
-    for i in range(7):
-        plt.hist(x_pred[:, i], bins=50)
-        plt.axvline(x_obs_original[i], color='red')
-        plt.savefig(dirname + f"prior_pred_{i}.pdf")
-        plt.clf()
+    # for i in range(7):
+    #     plt.hist(x_pred[:, i], bins=50)
+    #     plt.axvline(x_obs_original[i], color='red')
+    #     plt.savefig(dirname + f"prior_pred_{i}.pdf")
+    #     plt.clf()
 
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples)
-
+    # TODO! TESTING
+    num_posterior_samples = 10_000
+    num_warmup = 10_000
+    true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples, num_warmup=num_warmup)
 
     posterior_params = ['A', 'B', 'g', 'k']
     for ii, param in enumerate(posterior_params):
@@ -175,6 +184,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=10_000)
+    parser.add_argument("--n_sims", type=int, default=40_000)
     args = parser.parse_args()
     run_gnk(args)
