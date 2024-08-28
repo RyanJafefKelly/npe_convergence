@@ -4,6 +4,8 @@
 *.pkl
 .DS_Store
 *.mat
+.vscode/
+res/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
