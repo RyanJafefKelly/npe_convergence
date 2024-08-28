@@ -38,7 +38,7 @@ def run_mak(*args, **kwargs):
         n_obs = args.n_obs
         n_sims = args.n_sims
         ma_order = args.ma_order
-    dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    dirname = "res/ma" + str(ma_order) + "/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     print(f"Running MA of order {ma_order} model with seed: {seed}, n_obs: {n_obs}, n_sims: {n_sims}")
     if not os.path.exists(dirname):
         os.makedirs(dirname)
