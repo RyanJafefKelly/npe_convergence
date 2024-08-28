@@ -28,14 +28,15 @@ import pickle as pkl
 import arviz as az
 
 
-def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
+def run_mak(args):
+    seed, n_obs, n_sims = args.seed, args.n_obs, args.n_sims
     dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     print("Running MA of order k model with seed: ", seed)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    key = random.PRNGKey(0)
-    ma_order = 10
+    key = random.PRNGKey(seed)
+    ma_order = 12
     # true_params = random.uniform(key, (ma_order,), minval=-1, maxval=1)
     true_params = generate_valid_samples(key, ma_order, num_samples=1)
     t_bool = is_valid_sample(true_params)
@@ -51,27 +52,31 @@ def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
     num_posterior_samples = 10_000
     # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)
-    thinning = 10
+    thinning = 5 # TODO: BACK TO 10 
     # TODO: idea - SMC instead
     num_chains = 2 * ma_order
+    # num_chains = 4
     mcmc = MCMC(ess_kernel,
                 num_warmup=10_000,
                 num_samples=num_posterior_samples * thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
-                chain_method='vectorized')
+                chain_method='vectorized'
+                )
     # init_params = {'thetas': jnp.repeat(true_params, num_chains).reshape(num_chains, -1)}
-    # init_params = {'thetas': true_params}
+    init_params = jnp.tile(logit((true_params + 1) / 2), num_chains).reshape(num_chains, -1)
+    key, sub_key = random.split(key)
+    init_params = init_params + random.normal(sub_key, init_params.shape) * 0.05
+    init_params = {'thetas': init_params}
     # NOTE: HACKY ATM, non-identifiable but as starting at init_params, only explores one mode
     mcmc.run(random.PRNGKey(1), y_obs_original,
-    # init_params=init_params,
+    init_params=init_params,
     n_obs=n_obs)
     mcmc.print_summary()
     true_posterior_samples = mcmc.get_samples()
     inference_data = az.from_numpyro(mcmc)
 
 
-    # use arviz to plot trace, ess, and autocorr plots
     az.plot_trace(inference_data, compact=False)
     plt.savefig(f"{dirname}traceplots.png")
     plt.close()
@@ -148,6 +153,7 @@ def run_mak(seed: int = 0, n_obs: int = 500, n_sims: int = 10_000):
     for i in range(ma_order):
         _, bins, _ = plt.hist(posterior_samples[:, i], bins=50)
         plt.hist(true_posterior_samples[:, i], bins=bins, alpha=0.5)
+        plt.axvline(true_params[i], color='red')
         plt.savefig(f'{dirname}hist_{i}.pdf')
         plt.clf()
 
@@ -180,7 +186,7 @@ if __name__ == "__main__":
         epilog="Example usage: python run_mak.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=500)
-    parser.add_argument("--n_sims", type=int, default=10_000)
+    parser.add_argument("--n_obs", type=int, default=5000)
+    parser.add_argument("--n_sims", type=int, default=50_000)
     args = parser.parse_args()
     run_mak(args)
