@@ -29,14 +29,13 @@ import arviz as az
 
 
 def run_mak(args):
-    seed, n_obs, n_sims = args.seed, args.n_obs, args.n_sims
+    seed, n_obs, n_sims, ma_order = args.seed, args.n_obs, args.n_sims, args.ma_order
     dirname = "res/mak/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     print("Running MA of order k model with seed: ", seed)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
     key = random.PRNGKey(seed)
-    ma_order = 12
     # true_params = random.uniform(key, (ma_order,), minval=-1, maxval=1)
     true_params = generate_valid_samples(key, ma_order, num_samples=1)
     t_bool = is_valid_sample(true_params)
@@ -50,14 +49,14 @@ def run_mak(args):
     y_obs_original = y_obs.copy()
 
     num_posterior_samples = 10_000
+    num_warmup = 10_000
     # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)
-    thinning = 5 # TODO: BACK TO 10 
-    # TODO: idea - SMC instead
+    thinning = 10 #
     num_chains = 2 * ma_order
     # num_chains = 4
     mcmc = MCMC(ess_kernel,
-                num_warmup=10_000,
+                num_warmup=num_warmup,
                 num_samples=num_posterior_samples * thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
@@ -174,7 +173,6 @@ def run_mak(args):
     with open(f'{dirname}mmd.txt', 'w') as f:
         f.write(str(mmd))
 
-
     return kl, mmd
 
 
@@ -188,5 +186,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=5000)
     parser.add_argument("--n_sims", type=int, default=50_000)
+    parser.add_argument("--ma_order", type=int, default=6)
     args = parser.parse_args()
     run_mak(args)

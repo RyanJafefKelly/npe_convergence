@@ -75,7 +75,19 @@ def run_gnk(args):
     # TODO! TESTING
     num_posterior_samples = 10_000
     num_warmup = 10_000
-    true_thetas = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples, num_warmup=num_warmup)
+    mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples, num_warmup=num_warmup)
+    mcmc.print_summary()
+    inference_data = az.from_numpyro(mcmc)
+    true_thetas = mcmc.get_samples()
+    az.plot_trace(inference_data, compact=False)
+    plt.savefig(f"{dirname}traceplots.png")
+    plt.close()
+    az.plot_ess(inference_data, kind="evolution")
+    plt.savefig(f"{dirname}ess_plots.png")
+    plt.close()
+    az.plot_autocorr(inference_data)
+    plt.savefig(f"{dirname}autocorr.png")
+    plt.close()
 
     posterior_params = ['A', 'B', 'g', 'k']
     for ii, param in enumerate(posterior_params):
@@ -159,7 +171,6 @@ def run_gnk(args):
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
     mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
 
-
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
@@ -183,7 +194,7 @@ if __name__ == "__main__":
         epilog="Example usage: python run_gnk.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=40_000)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=50_000)
     args = parser.parse_args()
     run_gnk(args)

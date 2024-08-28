@@ -169,64 +169,24 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     """Run the NUTS sampler."""
     rng_key = random.PRNGKey(seed)
     kernel = NUTS(gnk_model)
-    aies_kernel = AIES(gnk_model, moves={AIES.DEMove() : 0.5,
-                           AIES.StretchMove() : 0.5},
-                    #    init_strategy='init_to_value'
-                       )
-    thinning = 1
-    # num_chains = 2 * len(obs)
+    thinning = 10
     num_chains = 4
-
-    A = jnp.array([3.0])
-    B = jnp.array([1.0])
-    B2 = jnp.array([0.39])
-    g = jnp.array([2.0])
-    k = jnp.array([0.5])
-    k2 = jnp.array([9.9])
-
-    norm_quantiles = norm.ppf(jnp.array([0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]))
-    expected_summaries = gnk(norm_quantiles, A, B, g, k)  # TODO: UGLY CODE
-    expected_summaries2 = gnk(norm_quantiles, A, B2, g, k2)  # TODO: UGLY CODE
-
-    # Sample y according to the quantile function
-    octiles = jnp.linspace(12.5, 87.5, 7) / 100
-    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
-    y_variance2 = [sample_var_fn(p, A, B2, g, k2, n_obs) for p in octiles]
-    y_stdev = [jnp.sqrt(var) for var in y_variance]
-    y_stdev2 = [jnp.sqrt(var) for var in y_variance2]
-
-    diff = obs - expected_summaries
-    diff_norm = [diff[i] / y_stdev[i] for i in range(7)]
-    diff2 = obs - expected_summaries2
-    diff_norm2 = [diff2[i] / y_stdev2[i] for i in range(7)]
 
     mcmc = MCMC(kernel,
                 num_warmup=num_warmup,
                 num_samples=num_samples*thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
-                # chain_method='vectorized'
                 )
+    rng_key, subkey = random.split(rng_key)
     init_params = {
-        'A': jnp.repeat(logit(jnp.array([3.0])/10), num_chains),
-        'B': jnp.repeat(logit(jnp.array([1.0])/10), num_chains),
-        'g': jnp.repeat(logit(jnp.array([2.0])/10), num_chains),
-        'k': jnp.repeat(logit(jnp.array([0.5])/10), num_chains)
+        'A': jnp.repeat(logit(jnp.array([3.0])/10), num_chains) + random.normal(subkey, (num_chains,)) * 0.05,
+        'B': jnp.repeat(logit(jnp.array([1.0])/10), num_chains) + random.normal(subkey, (num_chains,)) * 0.05,
+        'g': jnp.repeat(logit(jnp.array([2.0])/10), num_chains) + random.normal(subkey, (num_chains,)) * 0.05,
+        'k': jnp.repeat(logit(jnp.array([0.5])/10), num_chains) + random.normal(subkey, (num_chains,)) * 0.05
     }
     mcmc.run(rng_key=rng_key,
     init_params=init_params,  # NOTE: just cheat, want to be sampling exactly anyway
     obs=obs, n_obs=n_obs)
-    mcmc.print_summary()
-    inference_data = az.from_numpyro(mcmc)
-    dirname = ""
-    az.plot_trace(inference_data, compact=False)
-    plt.savefig(f"{dirname}traceplots.png")
-    plt.close()
-    az.plot_ess(inference_data, kind="evolution")
-    plt.savefig(f"{dirname}ess_plots.png")
-    plt.close()
-    az.plot_autocorr(inference_data)
-    plt.savefig(f"{dirname}autocorr.png")
-    plt.close()
 
-    return mcmc.get_samples()
+    return mcmc
