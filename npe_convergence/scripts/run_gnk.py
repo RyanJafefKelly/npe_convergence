@@ -54,7 +54,6 @@ def run_gnk(*args, **kwargs):
     x_obs_original = x_obs.copy()
     print("x_obs: ", x_obs)
 
-    num_posterior_samples = 10_000  # TODO! SEE WHAT CAN DO HERE WITH MMD
     # num_prior_pred_samples = 10_000
     # x = gnk(z, *true_params)
     # TODO: POOR FOR LOOP
@@ -75,10 +74,10 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    # TODO! TESTING
-    num_posterior_samples = 10_000
+    num_posterior_samples = 10_000  # TODO: see what can get away with for MMD
     num_warmup = 10_000
-    mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs, num_samples=num_posterior_samples, num_warmup=num_warmup)
+    mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
+                    num_samples=num_posterior_samples, num_warmup=num_warmup)
     mcmc.print_summary()
     inference_data = az.from_numpyro(mcmc)
     true_thetas = mcmc.get_samples()
@@ -159,7 +158,7 @@ def run_gnk(*args, **kwargs):
     posterior_samples = expit(posterior_samples) * 10
     # plt.xlim(0, 1)
     # true_thetas = true_thetas.T  # TODO: ugly
-    true_posterior_samples = jnp.zeros((num_posterior_samples, 4)) # TODO: ugly... just make a matrix from start
+    true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
     for ii, (key, values) in enumerate(true_thetas.items()):
         true_posterior_samples = true_posterior_samples.at[:, ii].set(values)
         _, bins, _ = plt.hist(posterior_samples[:, ii], bins=50, alpha=0.8, label='NPE')
@@ -171,8 +170,9 @@ def run_gnk(*args, **kwargs):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
-    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
-    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
+                                               posterior_samples]))
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)

@@ -1,3 +1,4 @@
+import numpyro  # type: ignore
 import argparse
 from npe_convergence.scripts.run_experiment import run_experiment
 from npe_convergence.scripts.run_gnk import run_gnk
@@ -5,12 +6,12 @@ from npe_convergence.scripts.run_gnk import run_gnk
 
 def run_gnk_experiments(args):
     seed = args.seed
-    kl_mat = run_experiment(run_gnk, seed)
+    _ = run_experiment(run_gnk, seed)
     return None
 
 
 if __name__ == "__main__":
-    # numpyro.set_host_device_count(4)
+    numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
         prog="run_gnk_experiments.py",
         description="Run experiments for gnk model.",
