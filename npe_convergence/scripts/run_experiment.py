@@ -1,12 +1,14 @@
-import jax.numpy as jnp
 import numpy as np
 import math
-import numpyro
+
 
 def run_experiment(experiment_fn, seed: int = 0, **kwargs):
-    n_obs = [100, 500, 1000, 5000]
+    n_obs = [100, 500, 1000, 5000, 10_000]
 
-    n_sims = [lambda n : n, lambda n: int(n * math.log(n)), lambda n : int(n ** (3/2)), lambda n : n ** 2]
+    n_sims = [lambda n: n,
+              lambda n: int(n * math.log(n)),
+              lambda n: int(n ** (3/2)),
+              lambda n: n ** 2]
 
     kl_mat = np.zeros((len(n_obs), len(n_sims)))
     mmd_mat = np.zeros((len(n_obs), len(n_sims)))
@@ -25,5 +27,6 @@ def run_experiment(experiment_fn, seed: int = 0, **kwargs):
 
     return None
 
+
 if __name__ == "__main__":
-    run_experiment()
+    run_experiment(None)

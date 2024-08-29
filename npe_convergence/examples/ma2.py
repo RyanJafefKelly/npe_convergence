@@ -85,7 +85,6 @@ class CustomPrior_t1:
         return p
 
 
-
 class CustomPrior_t2:
     """Define prior for t2 conditionally on t1 in range [-a, a], as in Marin et al., 2012."""
 

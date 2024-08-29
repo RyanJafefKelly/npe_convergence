@@ -49,7 +49,7 @@ def run_mak(*args, **kwargs):
     print("y_obs: ", y_obs)
     y_obs_original = y_obs.copy()
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 2_000
     num_warmup = 10_000
     nuts_kernel = NUTS(numpyro_model)
     # ess_kernel = ESS(numpyro_model)
@@ -157,8 +157,10 @@ def run_mak(*args, **kwargs):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
-    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples, posterior_samples]))
-    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale=lengthscale)
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
+                                               posterior_samples]))
+
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
@@ -183,8 +185,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_mak.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=5000)
-    parser.add_argument("--n_sims", type=int, default=11180)
+    parser.add_argument("--n_obs", type=int, default=100)
+    parser.add_argument("--n_sims", type=int, default=500)
     parser.add_argument("--ma_order", type=int, default=12)
     args = parser.parse_args()
     run_mak(args)

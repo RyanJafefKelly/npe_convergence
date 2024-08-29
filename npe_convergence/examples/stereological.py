@@ -1,8 +1,7 @@
 """Bortot et al. (2007)"""
 
 import jax.numpy as jnp
-# import jax.scipy.stats as stats
-import scipy.stats as ss
+import scipy.stats as ss  # type: ignore
 import jax.random as random
 from jax.scipy.special import logit, expit
 
@@ -26,15 +25,16 @@ def get_prior_samples(key, num_samples: int):
     poisson_rate_samples = 170 * random.uniform(subkey_1, (num_samples,)) + 30
     pareto_scale_samples = 15 * random.uniform(subkey_2, (num_samples,))
     pareto_shape_samples = 6 * random.uniform(subkey3, (num_samples,)) - 3
-    return jnp.column_stack([poisson_rate_samples, pareto_scale_samples, pareto_shape_samples])
+    return jnp.column_stack([poisson_rate_samples,
+                             pareto_scale_samples,
+                             pareto_shape_samples])
 
-def stereological(key, poisson_rate, pareto_scale, pareto_shape, num_samples):  # TODO: useful param names
-    # TODO: homogenous Poisson
+
+def stereological(key, poisson_rate, pareto_scale, pareto_shape, num_samples):
     # In 1D real-line, time between arrivals follows exponential distribution
     v_0 = 5  # CONSTANT
     key, subkey = random.split(key)
     number_locs = random.poisson(subkey, poisson_rate)
-    locations = None
     # TODO: should avoid reshapes ...
     pareto_samples = ss.genpareto.rvs(pareto_shape.reshape((-1, 1, 1)),
                                       scale=pareto_scale.reshape((-1, 1, 1)),
@@ -48,13 +48,11 @@ def stereological(key, poisson_rate, pareto_scale, pareto_shape, num_samples):  
     V2 = (pareto_samples - v_0) * unif_sample[..., 1] * pareto_samples + v_0
     V_tmp = jnp.maximum(V1, V2)
     if num_samples > 1:
-        V = jnp.where(jnp.arange(jnp.max(number_locs)) < number_locs[:, None], V_tmp, jnp.nan) # TODO!
+        V = jnp.where(jnp.arange(jnp.max(number_locs)) < number_locs[:, None], V_tmp, jnp.nan)  # TODO!
     else:
         V = V_tmp
-    
-    # V = jnp.sort(V, axis=1)
-    # V = jnp.where(V < v_0, jnp.nan, V)
     return V
+
 
 def get_summaries(x):
     # TODO: few options

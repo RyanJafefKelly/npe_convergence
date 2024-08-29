@@ -5,13 +5,12 @@ import os
 import pickle as pkl
 
 from npe_convergence.examples.gauss import gauss, get_summaries
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
+from npe_convergence.metrics import kullback_leibler, unbiased_mmd
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import CouplingFlow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
 import matplotlib.pyplot as plt
 
 

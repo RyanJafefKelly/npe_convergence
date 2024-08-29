@@ -1,1 +1,0 @@
-# TODO: consider? Conway-Maxwell-Poisson

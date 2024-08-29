@@ -167,10 +167,10 @@ class MAIdentifiablePrior(Distribution):
     def log_prob(self, value):
         # Compute the log probability assuming the sample is valid
         log_prob_uniform = -self.k * jnp.log(2 * self.a)
-        
+
         # Check sample validity using the is_valid_sample method
         valid = is_valid_sample(value)
-        
+
         # Use jnp.where to conditionally assign log probability
         return jnp.where(valid, log_prob_uniform, -jnp.inf)
 

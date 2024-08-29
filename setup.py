@@ -1,6 +1,6 @@
 from io import open
 
-from setuptools import setup
+from setuptools import setup  # type: ignore
 
 with open('requirements.txt', 'r') as f:
     requirements = f.read().splitlines()

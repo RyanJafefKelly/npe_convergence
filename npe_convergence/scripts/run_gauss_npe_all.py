@@ -1,16 +1,16 @@
-import jax.numpy as jnp
 import numpy as np
 import math
 
-from run_gauss_mean_npe import run_gauss_npe
+from run_gauss_mean_npe import run_gauss_npe  # type: ignore
+
 
 def run_gauss_npe_all():
-    n_obs = [100, 500, 1000]
+    n_obs = [100, 500, 1000, 5000]
 
-    # TODO: condiser * 10 or no?
-    n_sims = [lambda n : n, lambda n: int(n * math.log(n)), lambda n : int(n ** (3/2)), lambda n : n ** 2]
-
-    # result = [(n, f(n)) for n in n_obs for f in n_sims]
+    n_sims = [lambda n: n,
+              lambda n: int(n * math.log(n)),
+              lambda n: int(n ** (3/2)),
+              lambda n: n ** 2]
 
     kl_mat = np.zeros((len(n_obs), len(n_sims)))
 
@@ -25,6 +25,7 @@ def run_gauss_npe_all():
             kl_mat[ii, jj] = kl
 
     return None
+
 
 if __name__ == "__main__":
     run_gauss_npe_all()
