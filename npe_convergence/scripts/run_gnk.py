@@ -3,7 +3,6 @@
 import argparse
 import jax.numpy as jnp
 import jax.random as random
-import numpy as np
 
 import os
 from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile
@@ -21,8 +20,6 @@ import numpyro.distributions as dist  # type: ignore
 import matplotlib.pyplot as plt
 import pickle as pkl
 import arviz as az
-
-    
 
 
 def run_gnk(*args, **kwargs):
@@ -200,7 +197,7 @@ if __name__ == "__main__":
         epilog="Example usage: python run_gnk.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=5_000)
-    parser.add_argument("--n_sims", type=int, default=50_000)
+    parser.add_argument("--n_obs", type=int, default=100)
+    parser.add_argument("--n_sims", type=int, default=1_000)
     args = parser.parse_args()
     run_gnk(args)

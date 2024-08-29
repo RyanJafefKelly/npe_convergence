@@ -80,7 +80,7 @@ def get_model(n_obs=50, true_params=None, seed=None):
     elfi.Simulator(fn_simulator, *priors, observed=y_obs, name='GNK')
 
     # Initialising the summary statistics as in Allingham et al. (2009).
-    octile_ss = elfi.Summary(elfi_ss_octile, m['GNK'], name='ss_order')
+    octile_ss = elfi.Summary(elfi_ss_octile, m['GNK'], name='ss_octile')
     # Using the multi-dimensional Euclidean distance function as
     # the summary statistics' implementations are designed for multi-dimensional cases.
     elfi.Distance("euclidean", octile_ss, name='d')
