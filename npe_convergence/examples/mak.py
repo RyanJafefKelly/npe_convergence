@@ -1,19 +1,30 @@
-"""Generic moving average of order k model."""
+"""Moving average of order k model."""
 
 import jax.numpy as jnp
 import jax.random as random
 import numpy as np
-import numpyro
+import numpyro  # type: ignore
 from numpyro import distributions as dist
-from numpyro.distributions import Distribution
-from numpyro.distributions.constraints import real
-import numpyro.distributions.constraints as constraints
-import numpyro.distributions.util as dist_util
+from numpyro.distributions import Distribution  # type: ignore
+import numpyro.distributions.constraints as constraints  # type: ignore
+from jaxtyping import Array
 
 
-def autocov_exact(thetas, k, ma_order=1):
-    # NOTE: ASSUMPTION - white noise has constant variance one
-    res = 0
+def autocov_exact(thetas: Array,
+                  k: int,
+                  ma_order: int = 1
+                  ) -> Array:
+    """_summary_
+
+    Args:
+        thetas (jnp.ndarray): thetas for the MA model
+        k (int): autocovariance lag
+        ma_order (int, optional): lag of the whole MA model
+
+    Returns:
+        jnp.ndarray: exact autocovariance at lag k
+    """
+    res = jnp.array(0.0)
     # NOTE: assume passing in thetas care about, add in 1 for i=0 case
     thetas = jnp.concatenate((jnp.array([1.0]), thetas))
     for i in range(ma_order + 1):
@@ -22,8 +33,23 @@ def autocov_exact(thetas, k, ma_order=1):
     return res
 
 
-def sample_autocov_variance(thetas, k, n_obs, ma_order=1):
-    res = 0
+def sample_autocov_variance(thetas: Array,
+                            k: int,
+                            n_obs: int,
+                            ma_order: int = 1
+                            ) -> Array:
+    """Compute the (large sample) autocovariance variance.
+
+    Args:
+        thetas (Array): thetas for the MA model
+        k (int): autocovariance lag
+        n_obs (int): number of observations
+        ma_order (int, optional): lag of the whole MA model. Defaults to 1.
+
+    Returns:
+        Array: sample autocovariance variance
+    """
+    res = jnp.array(0.0)
     for i in range(-ma_order, ma_order + 1):
         tmp_k = i if i >= 0 else -i
         res += autocov_exact(thetas, tmp_k, ma_order) ** 2
@@ -38,7 +64,9 @@ def sample_autocov_variance(thetas, k, n_obs, ma_order=1):
     return res
 
 
-def autocov(x, lag=1):
+def autocov(x: jnp.ndarray,
+            lag: int = 1
+            ) -> jnp.ndarray:
     """Return the autocovariance.
 
     Assumes a (weak) univariate stationary process with mean 0.
@@ -46,7 +74,7 @@ def autocov(x, lag=1):
 
     Parameters
     ----------
-    x : np.array of size (n, m)
+    x : jnp.array of size (n, m)
     lag : int, optional
 
     Returns
@@ -59,12 +87,25 @@ def autocov(x, lag=1):
     return C
 
 
-def MAK(thetas, n_obs=100, batch_size=1, key=None):
+def MAK(key: Array,
+        thetas: Array,
+        n_obs: int = 100,
+        batch_size: int = 1
+        ) -> Array:
+    """Simulate a moving average of order k model.
+
+    Args:
+        key (Array): PRNG key
+        thetas (Array): thetas (of length k) for the MA model
+        n_obs (int, optional):  Defaults to 100.
+        batch_size (int, optional):  Defaults to 1.
+
+    Returns:
+        Array: time series data
+    """
     thetas = jnp.atleast_2d(thetas)
     batch_size, ma_order = thetas.shape  # assume 2d array
     w = random.normal(key, (batch_size, n_obs + ma_order))
-    # TODO! NEED TO THINK HOW THETAS COMING IN HERE
-    
     x = w[:, ma_order:]
     for i in range(ma_order):
         x += thetas[:, i].reshape((-1, 1)) * w[:, ma_order - i - 1: -i - 1]
@@ -82,16 +123,25 @@ def get_summaries(sim_data, ma_order):
 
 
 def numpyro_model(obs, a=1, n_obs=100):
-    ma_order = len(obs.ravel()) - 1  # TODO? better...assumes obs has var
-    
+    summary_length = len(obs.ravel())
+    ma_order = summary_length - 1
     # thetas = numpyro.sample("thetas", MAIdentifiablePrior(ma_order))
     thetas = numpyro.sample('thetas', dist.Uniform(-a, a).expand([ma_order]))
-    y_variance = [sample_autocov_variance(thetas, k, n_obs, len(obs.ravel())) for k in range(len(obs.ravel()))]
 
-    for i in range(len(y_variance)):
-        mean = autocov_exact(thetas, i, len(thetas))
-        stdev = jnp.sqrt(y_variance[i])
-        numpyro.sample(f'obs_{i}', dist.Normal(mean, stdev), obs=obs.ravel()[i])
+    y_variance = numpyro.deterministic(
+        "y_variance",
+        jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
+                   for k in range(ma_order + 1)])
+    )
+
+    mean = numpyro.deterministic(
+        "mean",
+        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(ma_order + 1)])
+    )
+
+    stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+
+    numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
 
 
 class MAIdentifiablePrior(Distribution):
@@ -124,6 +174,7 @@ class MAIdentifiablePrior(Distribution):
         # Use jnp.where to conditionally assign log probability
         return jnp.where(valid, log_prob_uniform, -jnp.inf)
 
+
 def generate_sample(key, k, intervals=None):
     """Generate a sample of theta parameters for an MA(k) model."""
     # Generate random theta values, for example, in the range [-2, 2]
@@ -133,18 +184,19 @@ def generate_sample(key, k, intervals=None):
     samples = jnp.array([random.uniform(k, minval=-a, maxval=a) for k, a in zip(keys, intervals)])
     return samples
 
+
 def is_valid_sample(theta):
     """Check if the sample is valid (all roots outside the unit circle)."""
     # coeffs =[1] + [-t for t in theta]  #TODO -t or t ?? t matches prior for ELFI, but -t would be my pick mathematically?
     theta = theta.ravel()
-    coeffs =  [t for t in theta] + [1]
+    coeffs = [t for t in theta] + [1]
     # print("coeff: ", coeffs)
     # roots = poly.Polynomial(coeffs).roots()
     roots = jnp.roots(jnp.array(coeffs), strip_zeros=False)
     return jnp.all(jnp.abs(roots) > 1)
 
+
 def generate_valid_samples(key, k, intervals=None, num_samples=1000):
-    # TODO! KEY
     """Generate valid samples for an MA(k) model using rejection sampling."""
     valid_samples = []
     count = 0
@@ -155,14 +207,3 @@ def generate_valid_samples(key, k, intervals=None, num_samples=1000):
         if is_valid_sample(theta):
             valid_samples.append(theta)
     return np.array(valid_samples)
-
-
-def log_prob(value, k, a):
-    # Compute the log probability assuming the sample is valid
-    log_prob_uniform = -k * jnp.log(2 * a)
-
-    # Check sample validity using the is_valid_sample method
-    valid = is_valid_sample(value)
-
-    # Use jnp.where to conditionally assign log probability
-    return jnp.where(valid, log_prob_uniform, -jnp.inf)

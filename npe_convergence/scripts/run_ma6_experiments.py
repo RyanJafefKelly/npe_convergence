@@ -6,7 +6,7 @@ from npe_convergence.scripts.run_mak import run_mak
 
 def run_ma6_experiments(args):
     seed = args.seed
-    kl_mat = run_experiment(run_mak, seed, ma_order=6)
+    _ = run_experiment(run_mak, seed, ma_order=6)
     return None
 
 

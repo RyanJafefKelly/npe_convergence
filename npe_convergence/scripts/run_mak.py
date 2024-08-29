@@ -1,27 +1,23 @@
 """Run MA of order k model."""
 
 import argparse
-import jax
 import jax.numpy as jnp
 import jax.random as random
-import numpy as np
 
 import os
-from npe_convergence.examples.mak import MAK, get_summaries, numpyro_model, generate_valid_samples, is_valid_sample, log_prob
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd, median_heuristic, unbiased_mmd
+from npe_convergence.examples.mak import MAK, get_summaries, numpyro_model, \
+    generate_valid_samples
+from npe_convergence.metrics import kullback_leibler, unbiased_mmd, \
+    median_heuristic
 
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-import flowjax.bijections as bij
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
 from jax.scipy.special import logit, expit
 
-import numpyro
-from numpyro.infer import MCMC, NUTS, ESS
-import numpyro.handlers as handlers
-import numpyro.distributions as dist
+import numpyro  # type: ignore
+from numpyro.infer import MCMC, NUTS  # type: ignore  # , ESS
 
 import matplotlib.pyplot as plt
 import pickle as pkl
@@ -44,45 +40,40 @@ def run_mak(*args, **kwargs):
         os.makedirs(dirname)
 
     key = random.PRNGKey(seed)
-    # true_params = random.uniform(key, (ma_order,), minval=-1, maxval=1)
     true_params = generate_valid_samples(key, ma_order, num_samples=1)
-    t_bool = is_valid_sample(true_params)
-    l_prob = log_prob(true_params, k=1.0, a=1.0)
     true_params = true_params.ravel()
     print("true_params: ", true_params)
     key, sub_key = random.split(key)
-    y_obs = MAK(true_params, n_obs=n_obs, key=sub_key)
+    y_obs = MAK(sub_key, true_params, n_obs=n_obs)
     y_obs = get_summaries(y_obs, ma_order)
     print("y_obs: ", y_obs)
     y_obs_original = y_obs.copy()
 
     num_posterior_samples = 10_000
     num_warmup = 10_000
-    # nuts_kernel = NUTS(numpyro_model)
-    ess_kernel = ESS(numpyro_model)
-    thinning = 10 #
-    num_chains = 2 * ma_order
-    # num_chains = 4
-    mcmc = MCMC(ess_kernel,
+    nuts_kernel = NUTS(numpyro_model)
+    # ess_kernel = ESS(numpyro_model)
+    thinning = 10
+    # num_chains = 2 * ma_order
+    num_chains = 4
+    mcmc = MCMC(nuts_kernel,
                 num_warmup=num_warmup,
                 num_samples=num_posterior_samples * thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
-                chain_method='vectorized'
+                # chain_method='vectorized'
                 )
-    # init_params = {'thetas': jnp.repeat(true_params, num_chains).reshape(num_chains, -1)}
     init_params = jnp.tile(logit((true_params + 1) / 2), num_chains).reshape(num_chains, -1)
     key, sub_key = random.split(key)
     init_params = init_params + random.normal(sub_key, init_params.shape) * 0.05
     init_params = {'thetas': init_params}
-    # NOTE: HACKY ATM, non-identifiable but as starting at init_params, only explores one mode
-    mcmc.run(random.PRNGKey(1), y_obs_original,
-    init_params=init_params,
-    n_obs=n_obs)
+    mcmc.run(random.PRNGKey(1),
+             y_obs_original,
+             init_params=init_params,
+             n_obs=n_obs)
     mcmc.print_summary()
     true_posterior_samples = mcmc.get_samples()
     inference_data = az.from_numpyro(mcmc)
-
 
     az.plot_trace(inference_data, compact=False)
     plt.savefig(f"{dirname}traceplots.png")
@@ -103,7 +94,7 @@ def run_mak(*args, **kwargs):
     thetas = logit((thetas_bounded + 1) / 2)
 
     key, sub_key = random.split(key)
-    sim_data = MAK(thetas_bounded, n_obs=n_obs, batch_size=n_sims, key=sub_key)
+    sim_data = MAK(sub_key, thetas_bounded, n_obs=n_obs, batch_size=n_sims)
     sim_summ_data = get_summaries(sim_data, ma_order)
 
     thetas_mean = thetas.mean(axis=0)
@@ -124,7 +115,7 @@ def run_mak(*args, **kwargs):
         key=sub_key,
         base_dist=Normal(jnp.zeros(theta_dims)),
         # base_dist=Uniform(minval=-3 * jnp.ones(theta_dims), maxval=3 * jnp.ones(theta_dims)),
-        transformer=RationalQuadraticSpline(knots=10, interval=5),  # 8 spline segments over [-3, 3].
+        transformer=RationalQuadraticSpline(knots=10, interval=5),  # 10 spline segments over [-5, 5].
         cond_dim=summary_dims,
         # flow_layers=8,  # NOTE: changed from 5, default is 8
         # nn_width=50,  # TODO: could experiment with
@@ -193,7 +184,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=5000)
-    parser.add_argument("--n_sims", type=int, default=50_000)
-    parser.add_argument("--ma_order", type=int, default=6)
+    parser.add_argument("--n_sims", type=int, default=11180)
+    parser.add_argument("--ma_order", type=int, default=12)
     args = parser.parse_args()
     run_mak(args)
