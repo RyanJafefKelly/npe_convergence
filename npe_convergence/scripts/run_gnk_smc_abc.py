@@ -78,7 +78,7 @@ def run_gnk_smc_abc(args):
 
     a, b, g, k = 3.0, 1.0, 2.0, 0.5
     true_params = jnp.array([a, b, g, k])
-    key = random.PRNGKey(0)
+    key = random.PRNGKey(seed)
 
     # follow normal approach so get same observed data
     z = random.normal(key, shape=(n_obs,))
