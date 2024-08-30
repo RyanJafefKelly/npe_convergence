@@ -105,7 +105,12 @@ def run_gnk(*args, **kwargs):
     thetas_unbounded = logit(thetas_bounded / 10)
 
     A, B, g, k = thetas_bounded.T
-    x = gnk(z, A[:, None], B[:, None], g[:, None], k[:, None])
+
+    key, sub_key = random.split(key)
+    z = random.normal(sub_key, shape=(n_obs, n_sims))
+
+    x = gnk(z, A[None, :], B[None, :], g[None, :], k[None, :])
+    x = x.T  # TODO: shouldn't have to do this
 
     x_sims = ss_octile(x)
 
@@ -115,7 +120,7 @@ def run_gnk(*args, **kwargs):
     thetas_std = thetas_unbounded.std(axis=0)
     thetas = (thetas_unbounded - thetas_mean) / thetas_std
 
-    sim_summ_data = x_sims.T  # TODO? ugly to do this
+    sim_summ_data = x_sims.T   # TODO? ugly to do this
     sim_summ_data_mean = sim_summ_data.mean(axis=0)
     sim_summ_data_std = sim_summ_data.std(axis=0)
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
@@ -197,7 +202,7 @@ if __name__ == "__main__":
         epilog="Example usage: python run_gnk.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=100)
-    parser.add_argument("--n_sims", type=int, default=1_000)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=100_000)
     args = parser.parse_args()
     run_gnk(args)
