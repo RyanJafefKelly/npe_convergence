@@ -5,7 +5,7 @@ import os
 from npe_convergence.examples.stereological import stereological, get_prior_samples, get_summaries, transform_to_unbounded, transform_to_bounded
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
-from flowjax.flows import CouplingFlow  # type: ignore
+from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 import flowjax.bijections as bij
 
@@ -54,7 +54,7 @@ def run_stereological_npe():
     key, sub_key = random.split(key)
     theta_dims = 3
     summary_dims = 4
-    flow = CouplingFlow(
+    flow = coupling_flow(
         key=sub_key,
         base_dist=Normal(jnp.zeros(theta_dims)),
         # base_dist=Uniform(minval=-3 * jnp.ones(theta_dims), maxval=3 * jnp.ones(theta_dims)),
@@ -62,9 +62,8 @@ def run_stereological_npe():
         cond_dim=summary_dims,
         # flow_layers=8,  # NOTE: changed from 5, default is 8
         # nn_width=50,  # TODO: could experiment with
-        # nn_depth=3  # TODO: could experiment with
+        nn_depth=2  # TODO: could experiment with
         )
-
     key, sub_key = random.split(key)
 
     flow, losses = fit_to_data(
@@ -72,10 +71,10 @@ def run_stereological_npe():
         dist=flow,
         x=thetas,
         condition=sim_summ_data,
-        learning_rate=5e-4,
-        max_epochs=1000,
-        max_patience=20,
-        batch_size=256
+        learning_rate=5e-4,  # TODO: could experiment with
+        max_epochs=2000,
+        max_patience=10,
+        batch_size=256,
     )
 
     plt.plot(losses['train'], label='train')
@@ -110,6 +109,39 @@ def run_stereological_npe():
     plt.clf()
 
     y_obs_original = jnp.squeeze(y_obs_original)
+    # TODO: NAIVE WAY FOR COVERAGE
+    num_coverage_samples = 100
+    coverage_levels = [0.8, 0.9, 0.95]
+    coverage_levels_counts = [0, 0, 0]
+    for i in range(num_coverage_samples):
+        key, sub_key = random.split(key)
+        theta_draw_original = get_prior_samples(sub_key, 1)
+
+        theta_draw = transform_to_unbounded(theta_draw_original)
+        theta_draw = (theta_draw - thetas_mean) / thetas_std
+
+        key, sub_key = random.split(sub_key)
+        x_draw_original = stereological(sub_key, *theta_draw_original.T, num_samples=1)
+        x_draw = get_summaries(x_draw_original)
+        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
+
+        posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_draw)
+        # posterior_samples = (posterior_samples * thetas_std) + thetas_mean
+        # posterior_samples = jnp.squeeze(posterior_samples)
+        # posterior_samples = transform_to_bounded(posterior_samples)
+        
+        pdf_posterior_samples = flow.log_prob(posterior_samples_original, x_draw)
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel())
+        pdf_theta = flow.log_prob(theta_draw, x_draw)
+
+        for i, level in enumerate(coverage_levels):
+            coverage_index = int(level * num_posterior_samples)
+            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+            if pdf_theta < pdf_posterior_sample:
+                coverage_levels_counts[i] += 1
+
+    print(coverage_levels_counts)
+    print(coverage_levels_counts/num_coverage_samples)
 
     ppc_samples = stereological(sub_key, *posterior_samples.T, num_samples=num_posterior_samples)
     ppc_summaries = get_summaries(ppc_samples)
@@ -133,6 +165,7 @@ def run_stereological_npe():
     plt.axvline(y_obs_original[3], color='red')
     plt.savefig('max_inclusions_posterior_stereo_npe_sim.pdf')
     plt.clf()
+
 
     pass
 
