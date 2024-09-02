@@ -192,8 +192,11 @@ def is_valid_sample(theta):
     coeffs = [t for t in theta] + [1]
     # print("coeff: ", coeffs)
     # roots = poly.Polynomial(coeffs).roots()
-    roots = jnp.roots(jnp.array(coeffs), strip_zeros=False)
-    return jnp.all(jnp.abs(roots) > 1)
+    roots = jnp.roots(jnp.array(coeffs))
+
+    all_roots_outside = jnp.all(jnp.abs(roots) > 1.02)  # NOTE: 1.01 to avoid weird exact sampling when close to 1.0
+
+    return all_roots_outside
 
 
 def generate_valid_samples(key, k, intervals=None, num_samples=1000):
