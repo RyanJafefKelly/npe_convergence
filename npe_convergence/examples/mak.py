@@ -119,24 +119,24 @@ def get_summaries(sim_data, ma_order):
     sim_summ_data[:, 0] = np.var(sim_data, axis=1)
     for i in range(1, ma_order + 1):
         sim_summ_data[:, i] = autocov(sim_data, lag=i)
-    return sim_summ_data
+    return sim_summ_data[:, 1:]  # TODO: lazy way of testing removal of sample var
 
 
 def numpyro_model(obs, a=1, n_obs=100):
     summary_length = len(obs.ravel())
-    ma_order = summary_length - 1
+    ma_order = summary_length  #  - 1  # TODO: TESTING
     # thetas = numpyro.sample("thetas", MAIdentifiablePrior(ma_order))
     thetas = numpyro.sample('thetas', dist.Uniform(-a, a).expand([ma_order]))
 
     y_variance = numpyro.deterministic(
         "y_variance",
         jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
-                   for k in range(ma_order + 1)])
+                   for k in range(1, ma_order+1)])
     )
 
     mean = numpyro.deterministic(
         "mean",
-        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(ma_order + 1)])
+        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(1, ma_order+1)])
     )
 
     stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
@@ -189,7 +189,7 @@ def is_valid_sample(theta):
     """Check if the sample is valid (all roots outside the unit circle)."""
     # coeffs =[1] + [-t for t in theta]  #TODO -t or t ?? t matches prior for ELFI, but -t would be my pick mathematically?
     theta = theta.ravel()
-    coeffs = [t for t in theta] + [1]
+    coeffs = [-t for t in theta] + [1]
     # print("coeff: ", coeffs)
     # roots = poly.Polynomial(coeffs).roots()
     roots = jnp.roots(jnp.array(coeffs))
@@ -209,4 +209,5 @@ def generate_valid_samples(key, k, intervals=None, num_samples=1000):
         count += 1
         if is_valid_sample(theta):
             valid_samples.append(theta)
+    is_valid_sample(valid_samples[0])
     return np.array(valid_samples)

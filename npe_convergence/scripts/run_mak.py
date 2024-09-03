@@ -17,7 +17,7 @@ from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import logit, expit
 
 import numpyro  # type: ignore
-from numpyro.infer import MCMC, NUTS  # type: ignore  # , ESS
+from numpyro.infer import MCMC, NUTS, ESS  # type: ignore  # , ESS
 
 import matplotlib.pyplot as plt
 import pickle as pkl
@@ -39,6 +39,8 @@ def run_mak(*args, **kwargs):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
+    # TODO: CHECK NORMALITY OF SAMPLE VARIANCE
+
     key = random.PRNGKey(seed)
     true_params = generate_valid_samples(key, ma_order, num_samples=1)
     true_params = true_params.ravel()
@@ -46,26 +48,26 @@ def run_mak(*args, **kwargs):
     key, sub_key = random.split(key)
     y_obs = MAK(sub_key, true_params, n_obs=n_obs)
     y_obs = get_summaries(y_obs, ma_order)
-    print("y_obs: ", y_obs)
+
     y_obs_original = y_obs.copy()
 
     num_posterior_samples = 10_000
     num_warmup = 10_000
     nuts_kernel = NUTS(numpyro_model)
-    # ess_kernel = ESS(numpyro_model)
+    ess_kernel = ESS(numpyro_model)
     thinning = 10
-    # num_chains = 2 * ma_order
-    num_chains = 4
-    mcmc = MCMC(nuts_kernel,
+    num_chains = 2 * ma_order
+    # num_chains = 4
+    mcmc = MCMC(ess_kernel,
                 num_warmup=num_warmup,
                 num_samples=num_posterior_samples * thinning // num_chains,
                 thinning=thinning,
                 num_chains=num_chains,
-                # chain_method='vectorized'
+                chain_method='vectorized'
                 )
     init_params = jnp.tile(logit((true_params + 1) / 2), num_chains).reshape(num_chains, -1)
     key, sub_key = random.split(key)
-    init_params = init_params + random.normal(sub_key, init_params.shape) * 0.05
+    init_params = init_params + random.normal(sub_key, init_params.shape) * 2.0
     init_params = {'thetas': init_params}
     mcmc.run(random.PRNGKey(1),
              y_obs_original,
@@ -109,7 +111,7 @@ def run_mak(*args, **kwargs):
 
     key, sub_key = random.split(key)
     theta_dims = ma_order
-    summary_dims = ma_order + 1
+    summary_dims = ma_order
 
     flow = coupling_flow(
         key=sub_key,
@@ -184,9 +186,9 @@ if __name__ == "__main__":
         description="Run MA of order k model.",
         epilog="Example usage: python run_mak.py"
     )
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=100)
-    parser.add_argument("--n_sims", type=int, default=500)
-    parser.add_argument("--ma_order", type=int, default=12)
+    parser.add_argument("--seed", type=int, default=15)
+    parser.add_argument("--n_obs", type=int, default=1000)
+    parser.add_argument("--n_sims", type=int, default=100_000)
+    parser.add_argument("--ma_order", type=int, default=6)
     args = parser.parse_args()
     run_mak(args)
