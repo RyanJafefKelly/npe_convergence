@@ -4,10 +4,10 @@ import jax.numpy as jnp
 import jax.random as random
 import numpy as np
 import numpyro  # type: ignore
-from numpyro import distributions as dist
-from numpyro.distributions import Distribution  # type: ignore
 import numpyro.distributions.constraints as constraints  # type: ignore
 from jaxtyping import Array
+from numpyro import distributions as dist
+from numpyro.distributions import Distribution  # type: ignore
 
 
 def autocov_exact(thetas: Array,

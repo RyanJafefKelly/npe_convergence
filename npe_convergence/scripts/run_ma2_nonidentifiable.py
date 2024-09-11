@@ -1,16 +1,19 @@
+import os
+
+import flowjax.bijections as bij
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.ma2 import MA2, autocov, CustomPrior_t1, CustomPrior_t2
+import matplotlib.pyplot as plt
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import (Normal, StandardNormal,  # type: ignore
+                                   Uniform)
 from flowjax.flows import CouplingFlow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
+from jax.scipy.special import expit, logit
 
-import matplotlib.pyplot as plt
-from jax.scipy.special import logit, expit
+from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
+                                          autocov)
+
 
 def run_ma2():
     # TODO: num sim, n_obs, effects

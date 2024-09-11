@@ -1,6 +1,6 @@
-import numpy as np
 import math
 
+import numpy as np
 from run_gauss_mean_npe import run_gauss_npe  # type: ignore
 
 

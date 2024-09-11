@@ -1,22 +1,24 @@
 """Run gnk model using SMC ABC."""
 
 import argparse
-import jax.numpy as jnp
-import jax.random as random
-import numpy as np
-
 import os
-from npe_convergence.examples.gnk import gnk
-# from npe_convergence.metrics import kullback_leibler, unbiased_mmd, median_heuristic
-
-
-import matplotlib.pyplot as plt
 import pickle as pkl
-
 from functools import partial
 
 import elfi  # type: ignore
+import jax.numpy as jnp
+import jax.random as random
+import matplotlib.pyplot as plt
+import numpy as np
 from elfi.examples.gnk import GNK as elfi_GNK  # type: ignore
+
+from npe_convergence.examples.gnk import gnk
+
+# from npe_convergence.metrics import kullback_leibler, unbiased_mmd, median_heuristic
+
+
+
+
 
 
 def elfi_GNK_mask(A, B, g, k, c=0.8, n_obs=50, batch_size=1, random_state=None):

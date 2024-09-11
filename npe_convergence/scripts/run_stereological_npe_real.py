@@ -1,17 +1,22 @@
+import os
+
+import flowjax.bijections as bij
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.stereological import stereological, get_prior_samples, get_summaries, transform_to_unbounded, transform_to_bounded
-from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
-from flowjax.flows import CouplingFlow  # type: ignore
-from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
-
 import matplotlib.pyplot as plt
 import scipy.io as sio
-from jax.scipy.special import logit, expit
+from flowjax.bijections import RationalQuadraticSpline  # type: ignore
+from flowjax.distributions import (Normal, StandardNormal,  # type: ignore
+                                   Uniform)
+from flowjax.flows import CouplingFlow  # type: ignore
+from flowjax.train.data_fit import fit_to_data  # type: ignore
+from jax.scipy.special import expit, logit
+
+from npe_convergence.examples.stereological import (get_prior_samples,
+                                                    get_summaries,
+                                                    stereological,
+                                                    transform_to_bounded,
+                                                    transform_to_unbounded)
 
 
 def run_stereological_npe():

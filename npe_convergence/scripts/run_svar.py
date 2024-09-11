@@ -1,25 +1,25 @@
+import os
+import pickle as pkl
+
+import flowjax.bijections as bij
 import jax
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.svar import svar, run_inference, compute_summaries  # TODO!
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
-
+import matplotlib.pyplot as plt
+import numpyro.distributions as dist
+import numpyro.handlers as handlers
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-import flowjax.bijections as bij
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import (Normal, StandardNormal,  # type: ignore
+                                   Uniform)
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
-from jax.scipy.special import logit, expit
-
+from jax.scipy.special import expit, logit
 from numpyro.infer import MCMC, NUTS
-import numpyro.handlers as handlers
-import numpyro.distributions as dist
 
-import matplotlib.pyplot as plt
-import pickle as pkl
+from npe_convergence.examples.svar import (compute_summaries,  # TODO!
+                                           run_inference, svar)
+from npe_convergence.metrics import (kullback_leibler, total_variation,
+                                     unbiased_mmd)
 
 
 def run_svar(n_obs: int = 100, n_sims: int = 1_000):

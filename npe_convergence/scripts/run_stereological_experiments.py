@@ -1,5 +1,7 @@
-import numpyro  # type: ignore
 import argparse
+
+import numpyro  # type: ignore
+
 from npe_convergence.scripts.run_experiment import run_experiment
 from npe_convergence.scripts.run_stereological import run_stereological
 

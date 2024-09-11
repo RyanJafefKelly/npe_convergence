@@ -1,6 +1,7 @@
 """Run simple Gauss example."""
 import jax.numpy as jnp
 import jax.random as random
+
 from npe_convergence.examples.gauss import gauss, get_summaries
 
 

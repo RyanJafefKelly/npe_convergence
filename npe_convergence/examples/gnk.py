@@ -4,11 +4,10 @@ import jax.numpy as jnp
 import jax.random as random
 import numpyro  # type: ignore
 import numpyro.distributions as dist  # type: ignore
-
-from numpyro.infer import MCMC, NUTS  # type: ignore
-from jax.scipy.stats import norm
-from jax.scipy.special import logit
 from jax import lax
+from jax.scipy.special import logit
+from jax.scipy.stats import norm
+from numpyro.infer import MCMC, NUTS  # type: ignore
 
 
 def gnk(z, A, B, g, k, c=0.8):

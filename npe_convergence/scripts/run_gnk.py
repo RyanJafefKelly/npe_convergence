@@ -1,25 +1,24 @@
 """Run gnk model."""
 
 import argparse
+import os
+import pickle as pkl
+
+import arviz as az
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile
-from npe_convergence.metrics import kullback_leibler, unbiased_mmd, median_heuristic
-
+import matplotlib.pyplot as plt
+import numpyro  # type: ignore
+import numpyro.distributions as dist  # type: ignore
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-from jax.scipy.special import logit, expit
+from jax.scipy.special import expit, logit
 
-import numpyro  # type: ignore
-import numpyro.distributions as dist  # type: ignore
-
-import matplotlib.pyplot as plt
-import pickle as pkl
-import arviz as az
+from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile
+from npe_convergence.metrics import (kullback_leibler, median_heuristic,
+                                     unbiased_mmd)
 
 
 def run_gnk(*args, **kwargs):

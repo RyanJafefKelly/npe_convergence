@@ -1,13 +1,11 @@
 import jax.numpy as jnp
 import jax.random as random
-from jax import lax
-
 import numpy as np
-
 import numpyro
 import numpyro.contrib
 import numpyro.contrib.control_flow
 import numpyro.distributions as dist
+from jax import lax
 
 PAIRS = ([0, 5], [3, 1], [4, 2])
 # indices = ([0, 5], ...)  # TODO? neater or weird?

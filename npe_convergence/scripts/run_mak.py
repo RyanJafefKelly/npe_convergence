@@ -1,27 +1,25 @@
 """Run MA of order k model."""
 
 import argparse
+import os
+import pickle as pkl
+
+import arviz as az
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.mak import MAK, get_summaries, numpyro_model, \
-    generate_valid_samples
-from npe_convergence.metrics import kullback_leibler, unbiased_mmd, \
-    median_heuristic
-
+import matplotlib.pyplot as plt
+import numpyro  # type: ignore
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-from jax.scipy.special import logit, expit
+from jax.scipy.special import expit, logit
+from numpyro.infer import ESS, MCMC, NUTS  # type: ignore  # , ESS
 
-import numpyro  # type: ignore
-from numpyro.infer import MCMC, NUTS, ESS  # type: ignore  # , ESS
-
-import matplotlib.pyplot as plt
-import pickle as pkl
-import arviz as az
+from npe_convergence.examples.mak import (MAK, generate_valid_samples,
+                                          get_summaries, numpyro_model)
+from npe_convergence.metrics import (kullback_leibler, median_heuristic,
+                                     unbiased_mmd)
 
 
 def run_mak(*args, **kwargs):

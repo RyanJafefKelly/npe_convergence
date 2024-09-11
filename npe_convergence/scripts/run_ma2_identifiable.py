@@ -1,23 +1,25 @@
+import os
+import pickle as pkl
+
+import flowjax.bijections as bij
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.ma2 import MA2, autocov, CustomPrior_t1, CustomPrior_t2, numpyro_model, sample_autocov_variance
-from npe_convergence.metrics import kullback_leibler, total_variation, unbiased_mmd
-
+import matplotlib.pyplot as plt
+import numpyro.handlers as handlers
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-import flowjax.bijections as bij
-from flowjax.distributions import Normal, StandardNormal, Uniform  # type: ignore
+from flowjax.distributions import (Normal, StandardNormal,  # type: ignore
+                                   Uniform)
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import flowjax.bijections as bij
-from jax.scipy.special import logit, expit
-
+from jax.scipy.special import expit, logit
 from numpyro.infer import MCMC, NUTS
-import numpyro.handlers as handlers
 
-import matplotlib.pyplot as plt
-import pickle as pkl
+from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
+                                          autocov, numpyro_model,
+                                          sample_autocov_variance)
+from npe_convergence.metrics import (kullback_leibler, total_variation,
+                                     unbiased_mmd)
+
 
 def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
     dirname = "res/ma2_npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"

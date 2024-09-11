@@ -1,18 +1,16 @@
-import jax.numpy as jnp
-import jax.random as random
-
-import os
-import numpy as np
-from npe_convergence.examples.mak import MAK, autocov, generate_valid_samples
-
-import matplotlib.pyplot as plt
-import pickle as pkl
-
-import elfi  # type: ignore
 # from elfi.examples.ma2 import get_model  # type: ignore
 import argparse
-
+import os
+import pickle as pkl
 from functools import partial
+
+import elfi  # type: ignore
+import jax.numpy as jnp
+import jax.random as random
+import matplotlib.pyplot as plt
+import numpy as np
+
+from npe_convergence.examples.mak import MAK, autocov, generate_valid_samples
 
 
 def elfi_MAK(*thetas, n_obs=100, batch_size=1, random_state=None):

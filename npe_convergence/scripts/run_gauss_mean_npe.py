@@ -1,17 +1,17 @@
 """Run simple Gauss example."""
-import jax.numpy as jnp
-import jax.random as random
 import os
 import pickle as pkl
 
-from npe_convergence.examples.gauss import gauss, get_summaries
-from npe_convergence.metrics import kullback_leibler, unbiased_mmd
-
+import jax.numpy as jnp
+import jax.random as random
+import matplotlib.pyplot as plt
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import CouplingFlow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
-import matplotlib.pyplot as plt
+
+from npe_convergence.examples.gauss import gauss, get_summaries
+from npe_convergence.metrics import kullback_leibler, unbiased_mmd
 
 
 def run_gauss_npe(n_obs: int = 100, n_sims: int = 10_000):

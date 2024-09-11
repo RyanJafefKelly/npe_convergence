@@ -1,16 +1,15 @@
-import jax.numpy as jnp
-import jax.random as random
-
+import argparse
 import os
-import numpy as np
-from npe_convergence.examples.ma2 import MA2, autocov
-
-import matplotlib.pyplot as plt
 import pickle as pkl
 
 import elfi  # type: ignore
+import jax.numpy as jnp
+import jax.random as random
+import matplotlib.pyplot as plt
+import numpy as np
 from elfi.examples.ma2 import get_model  # type: ignore
-import argparse
+
+from npe_convergence.examples.ma2 import MA2, autocov
 
 
 def run_ma2_identifiable_smc_abc(*args, **kwargs):

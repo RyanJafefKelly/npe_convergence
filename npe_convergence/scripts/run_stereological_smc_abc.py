@@ -1,17 +1,19 @@
-import jax.numpy as jnp
-import jax.random as random
-
+import argparse
 import os
-from npe_convergence.examples.stereological import stereological, get_prior_samples, transform_to_unbounded, transform_to_bounded
-
-import matplotlib.pyplot as plt
+import pickle as pkl
+from functools import partial
 
 import elfi  # type: ignore
+import jax.numpy as jnp
+import jax.random as random
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as ss  # type: ignore
-from functools import partial
-import argparse
-import pickle as pkl
+
+from npe_convergence.examples.stereological import (get_prior_samples,
+                                                    stereological,
+                                                    transform_to_bounded,
+                                                    transform_to_unbounded)
 
 
 def stereological_sim(poisson_rate, pareto_scale, pareto_shape, n_obs=100, batch_size=1, random_state=None):

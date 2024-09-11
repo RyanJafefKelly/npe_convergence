@@ -1,18 +1,21 @@
+import argparse
+import os
+import pickle as pkl
+
 import jax.numpy as jnp
 import jax.random as random
-
-import os
-from npe_convergence.examples.stereological import stereological, get_prior_samples, get_summaries, transform_to_unbounded, transform_to_bounded
+import matplotlib.pyplot as plt
+import numpyro  # type: ignore
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 
-import matplotlib.pyplot as plt
-
-import numpyro  # type: ignore
-import argparse
-import pickle as pkl
+from npe_convergence.examples.stereological import (get_prior_samples,
+                                                    get_summaries,
+                                                    stereological,
+                                                    transform_to_bounded,
+                                                    transform_to_unbounded)
 
 
 def run_stereological(*args, **kwargs):

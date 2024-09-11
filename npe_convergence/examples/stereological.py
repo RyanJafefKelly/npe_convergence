@@ -1,10 +1,10 @@
 """Bortot et al. (2007)"""
 
 import jax.numpy as jnp
-import scipy.stats as ss  # type: ignore
 import jax.random as random
-from jax.scipy.special import logit, expit
 import numpy as np
+import scipy.stats as ss  # type: ignore
+from jax.scipy.special import expit, logit
 
 
 def transform_to_unbounded(theta):

@@ -1,9 +1,9 @@
 """Metrics."""
 
-import numpy as np
 import jax.numpy as jnp
-from scipy.spatial import KDTree  # type: ignore
+import numpy as np
 from jaxtyping import Array
+from scipy.spatial import KDTree  # type: ignore
 
 
 def rbf_kernel(x, y, lengthscale=1.0):
