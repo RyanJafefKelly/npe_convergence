@@ -108,7 +108,7 @@ def run_stereological_smc_abc(*args, **kwargs):
         n_obs = args.n_obs
         n_sims = args.n_sims
 
-    dirname = "res/stereological/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
+    dirname = "res/stereological_smc_abc/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
@@ -129,8 +129,8 @@ def run_stereological_smc_abc(*args, **kwargs):
 
     np.random.seed(seed)
 
-    max_iter = 5
-    num_posterior_samples = 4_000
+    max_iter = 30
+    num_posterior_samples = 10_000
     adaptive_smc = elfi.AdaptiveThresholdSMC(m['d'],
                                              batch_size=1_000,
                                              seed=seed,
