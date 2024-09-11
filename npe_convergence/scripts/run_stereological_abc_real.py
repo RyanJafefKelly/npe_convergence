@@ -49,7 +49,7 @@ def run_stereological_npe():
     sim_summ_data_std = sim_summ_data.std(axis=0)
 
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
- 
+
     def distance_fn(x, y):
         return jnp.sum((x - y) ** 2, axis=-1)
 
