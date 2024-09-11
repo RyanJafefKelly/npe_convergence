@@ -1,51 +1,42 @@
 import os
 import pickle as pkl
 
-import flowjax.bijections as bij
 import jax.numpy as jnp
 import jax.random as random
 import matplotlib.pyplot as plt
-import numpyro.handlers as handlers
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
-from flowjax.distributions import (Normal, StandardNormal,  # type: ignore
-                                   Uniform)
+from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
-from numpyro.infer import MCMC, NUTS
+from numpyro.infer import MCMC, NUTS  # type: ignore
 
 from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
-                                          autocov, numpyro_model,
-                                          sample_autocov_variance)
-from npe_convergence.metrics import (kullback_leibler, total_variation,
-                                     unbiased_mmd)
+                                          autocov, numpyro_model)
+from npe_convergence.metrics import kullback_leibler, median_heuristic, unbiased_mmd
 
 
-def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
-    dirname = "res/ma2_npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "/"
+def run_ma2_identifiable(*args, **kwargs):
+    try:
+        seed, n_obs, n_sims = args
+    except ValueError:
+        args = args[0]
+        seed = args.seed
+        n_obs = args.n_obs
+        n_sims = args.n_sims
+    dirname = "res/ma2/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-    key = random.PRNGKey(0)
     true_params = jnp.array([0.6, 0.2])
+    key = random.PRNGKey(seed)
     y_obs = MA2(*true_params, n_obs=n_obs, key=key)
     y_obs = jnp.array([[jnp.var(y_obs)], autocov(y_obs, lag=1), autocov(y_obs, lag=2)]).ravel()
 
     y_obs_original = y_obs.copy()
 
-    # prior predictive samples
-    num_prior_pred_samples = 10_000
-    prior_pred_sim_data = MA2(jnp.repeat(true_params[0], num_prior_pred_samples), jnp.repeat(true_params[1], num_prior_pred_samples), batch_size=num_prior_pred_samples, n_obs=n_obs, key=key)
-    prior_pred_summ_data = jnp.array((jnp.var(prior_pred_sim_data, axis=1), autocov(prior_pred_sim_data, lag=1), autocov(prior_pred_sim_data, lag=2)))
-    print("stdev: ", jnp.std(prior_pred_summ_data, axis=1))
-    # test_t1 = CustomPrior_t1.rvs(2., size=(1,), random_state=10)
-    # test_t2 = CustomPrior_t2.rvs(test_t1, 1., size=(1,), random_state=10)
-    sample_summ_var = sample_autocov_variance(true_params, k=1, n_obs=n_obs, ma_order=2)
-    print("sample_summ_std k = 1: ", jnp.sqrt(sample_summ_var))
-
-
     key, sub_key = random.split(key)
 
-    num_posterior_samples = 100_000
+    num_posterior_samples = 10_000
 
     nuts_kernel = NUTS(numpyro_model)
     thinning = 10
@@ -57,7 +48,6 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
     mcmc.print_summary()
     samples = mcmc.get_samples()
     true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
-
 
     key, sub_key = random.split(key)
     t1_bounded = CustomPrior_t1.rvs(2., size=(n_sims,), key=sub_key)
@@ -106,7 +96,7 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
         dist=flow,
         x=thetas,
         condition=sim_summ_data,
-        learning_rate=5e-5,  # TODO: could experiment with
+        learning_rate=5e-4,  # TODO: could experiment with
         max_epochs=2000,
         max_patience=20,
         batch_size=256,
@@ -173,6 +163,10 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
 
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
+                                               posterior_samples]))
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
+
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
@@ -182,7 +176,10 @@ def run_ma2_identifiable(n_obs: int = 1000, n_sims: int = 10_000):
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))
 
-    return kl
+    with open(f'{dirname}mmd.txt', 'w') as f:
+        f.write(str(mmd))
+
+    return kl, mmd
 
 
 if __name__ == '__main__':

@@ -89,7 +89,7 @@ def run_ma6_identifiable_smc_abc(*args, **kwargs):
     adaptive_smc = elfi.AdaptiveThresholdSMC(m['d'],
                                              batch_size=1_000,
                                              seed=seed,
-                                             q_threshold=0.99)
+                                             q_threshold=0.995)
     adaptive_smc_samples = adaptive_smc.sample(num_posterior_samples,
                                                max_iter=max_iter)
 
