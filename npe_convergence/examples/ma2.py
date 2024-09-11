@@ -2,7 +2,7 @@
 
 import jax.numpy as jnp
 import jax.random as random
-import numpyro
+import numpyro  # type: ignore
 from numpyro import distributions as dist
 
 
@@ -32,6 +32,7 @@ def sample_autocov_variance(thetas, k, n_obs, ma_order=1):
 
     return res
 
+
 def MA2(t1, t2, n_obs=100, batch_size=1, key=None):
     # TODO: could make faster (e.g. use scan)
     # NOTE: adapted from ELFI
@@ -41,7 +42,6 @@ def MA2(t1, t2, n_obs=100, batch_size=1, key=None):
 
     # i.i.d. sequence ~ N(0,1)
     w = random.normal(key, (batch_size, n_obs + 2))
-    # TODO! DOUBLE CHECK BELOW LINE
     x = w[:, 2:] + t1 * w[:, 1:-1] + t2 * w[:, :-2]
     return x
 
