@@ -44,6 +44,7 @@ def run_mak(*args, **kwargs):
     key = random.PRNGKey(seed)
     true_params = generate_valid_samples(key, ma_order, num_samples=1)
     true_params = true_params.ravel()
+    # true_params = true_params[::-1]  # NOTE: reverse the order
     print("true_params: ", true_params)
     key, sub_key = random.split(key)
     y_obs = MAK(sub_key, true_params, n_obs=n_obs)
@@ -67,7 +68,7 @@ def run_mak(*args, **kwargs):
                 )
     init_params = jnp.tile(logit((true_params + 1) / 2), num_chains).reshape(num_chains, -1)
     key, sub_key = random.split(key)
-    init_params = init_params + random.normal(sub_key, init_params.shape) * 2.0
+    init_params = init_params + random.normal(sub_key, init_params.shape) * 0.1
     init_params = {'thetas': init_params}
     mcmc.run(random.PRNGKey(1),
              y_obs_original,

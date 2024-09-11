@@ -189,12 +189,12 @@ def is_valid_sample(theta):
     """Check if the sample is valid (all roots outside the unit circle)."""
     # coeffs =[1] + [-t for t in theta]  #TODO -t or t ?? t matches prior for ELFI, but -t would be my pick mathematically?
     theta = theta.ravel()
-    coeffs = [-t for t in theta] + [1]
+    coeffs = [-t for t in theta] + [1]  # -theta_k y^k -... - theta_1 y + 1 = 0
     # print("coeff: ", coeffs)
     # roots = poly.Polynomial(coeffs).roots()
     roots = jnp.roots(jnp.array(coeffs))
 
-    all_roots_outside = jnp.all(jnp.abs(roots) > 1.02)  # NOTE: 1.01 to avoid weird exact sampling when close to 1.0
+    all_roots_outside = jnp.all(jnp.abs(roots) > 1.01)  # NOTE: 1.01 to avoid weird exact sampling when close to 1.0
 
     return all_roots_outside
 
