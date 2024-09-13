@@ -67,6 +67,72 @@ def autocov(x, lag=1):
     return C
 
 
+def get_summaries(x):
+    """Compute summaries: variance and autocovariances at lags 1 and 2.
+
+    Parameters
+    ----------
+    x : jnp.array of shape (n_samples, n_obs)
+
+    Returns
+    -------
+    summaries : jnp.array of shape (n_samples, 3)
+    """
+    var_x = jnp.var(x, axis=1)
+    acov1 = autocov(x, lag=1)
+    acov2 = autocov(x, lag=2)
+    summaries = jnp.stack((var_x, acov1, acov2), axis=1)
+    return summaries
+
+
+def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size):
+    """Process simulations in batches to save memory.
+
+    Parameters
+    ----------
+    key : PRNGKey
+        JAX random number generator key.
+    t1 : jnp.array
+        Array of MA(2) parameter t1 values.
+    t2 : jnp.array
+        Array of MA(2) parameter t2 values.
+    n_obs : int
+        Number of observations per simulation.
+    n_sims : int
+        Total number of simulations.
+    batch_size : int
+        Number of simulations per batch.
+
+    Returns
+    -------
+    all_summaries : jnp.array of shape (n_sims, 3)
+        Summaries for all simulations.
+    """
+    num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
+    all_summaries = []
+
+    for i in range(num_batches):
+        # Update key for randomness
+        sub_key, key = random.split(key)
+        batch_size_i = min(batch_size, n_sims - i * batch_size)
+
+        # Extract batch parameters
+        t1_batch = t1[i * batch_size : i * batch_size + batch_size_i]
+        t2_batch = t2[i * batch_size : i * batch_size + batch_size_i]
+
+        # Run simulations for the batch
+        sim_data_batch = MA2(t1_batch, t2_batch, n_obs=n_obs, batch_size=batch_size_i, key=sub_key)
+
+        # Compute summaries for the batch
+        sim_summ_data_batch = get_summaries(sim_data_batch)
+
+        # Collect summaries
+        all_summaries.append(sim_summ_data_batch)
+
+    # Concatenate all summaries
+    return jnp.concatenate(all_summaries, axis=0)
+
+
 class CustomPrior_t1:
     """Define prior for t1 in range [-a, a], as in Marin et al., 2012."""
 

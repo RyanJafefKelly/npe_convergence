@@ -80,3 +80,24 @@ def get_summaries(x):
     # if not jnp.all(jnp.isfinite(ssx)):
     #     print("WARNING: non-finite summary statistics")
     return ssx.T
+
+
+def get_summaries_batches(key, thetas, n_obs, n_sims, batch_size):
+    poisson_rate = thetas[:, 0]
+    pareto_scale = thetas[:, 1]
+    pareto_shape = thetas[:, 2]
+    num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
+    all_summaries = []
+
+    for i in range(num_batches):
+        sub_key, key = random.split(key)
+        batch_size_i = min(batch_size, n_sims - i * batch_size)
+        poisson_rate_batch = poisson_rate[i * batch_size:(i + 1) * batch_size]
+        pareto_scale_batch = pareto_scale[i * batch_size:(i + 1) * batch_size]
+        pareto_shape_batch = pareto_shape[i * batch_size:(i + 1) * batch_size]
+
+        sim_data_batch = stereological(sub_key, poisson_rate_batch, pareto_scale_batch, pareto_shape_batch, n_obs=n_obs, num_samples=batch_size_i)
+        sim_summ_data_batch = get_summaries(sim_data_batch)
+        all_summaries.append(sim_summ_data_batch)
+
+    return jnp.concatenate(all_summaries, axis=0)

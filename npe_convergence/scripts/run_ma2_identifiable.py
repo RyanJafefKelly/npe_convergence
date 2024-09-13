@@ -1,5 +1,6 @@
 import os
 import pickle as pkl
+import argparse
 
 import jax.numpy as jnp
 import jax.random as random
@@ -12,8 +13,10 @@ from jax.scipy.special import expit, logit
 from numpyro.infer import MCMC, NUTS  # type: ignore
 
 from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
-                                          autocov, numpyro_model)
-from npe_convergence.metrics import kullback_leibler, median_heuristic, unbiased_mmd
+                                          autocov, numpyro_model, get_summaries,
+                                          get_summaries_batches)
+from npe_convergence.metrics import (kullback_leibler, median_heuristic,
+                                     unbiased_mmd)
 
 
 def run_ma2_identifiable(*args, **kwargs):
@@ -36,7 +39,7 @@ def run_ma2_identifiable(*args, **kwargs):
 
     key, sub_key = random.split(key)
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 4_000
 
     nuts_kernel = NUTS(numpyro_model)
     thinning = 10
@@ -58,9 +61,12 @@ def run_ma2_identifiable(*args, **kwargs):
     t2 = logit((t2_bounded + 1) / 2)
 
     key, sub_key = random.split(key)
-    sim_data = MA2(t1_bounded, t2_bounded, n_obs=n_obs, batch_size=n_sims, key=sub_key)
+    # sim_data = MA2(t1_bounded, t2_bounded, n_obs=n_obs, batch_size=n_sims, key=sub_key)
     # sim_summ_data = sim_data
-    sim_summ_data = jnp.array((jnp.var(sim_data, axis=1), autocov(sim_data, lag=1), autocov(sim_data, lag=2)))
+    # sim_summ_data = jnp.array((jnp.var(sim_data, axis=1), autocov(sim_data, lag=1), autocov(sim_data, lag=2)))
+
+    batch_size = 1_000
+    sim_summ_data = get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size)
 
     thetas = jnp.column_stack([t1, t2])
     # thetas = jnp.vstack([thetas, true_params])  # TODO: FOR TESTING
@@ -68,7 +74,7 @@ def run_ma2_identifiable(*args, **kwargs):
     thetas_std = thetas.std(axis=0)
     thetas = (thetas - thetas_mean) / thetas_std
 
-    sim_summ_data = sim_summ_data.T
+    # sim_summ_data = sim_summ_data.T
     # sim_summ_data = jnp.vstack([sim_summ_data, y_obs])  # TODO: FOR TESTING
     sim_summ_data_mean = sim_summ_data.mean(axis=0)
     sim_summ_data_std = sim_summ_data.std(axis=0)
@@ -179,8 +185,69 @@ def run_ma2_identifiable(*args, **kwargs):
     with open(f'{dirname}mmd.txt', 'w') as f:
         f.write(str(mmd))
 
+    num_coverage_samples = 100
+    coverage_levels = [0.8, 0.9, 0.95]
+    coverage_levels_counts = [0, 0, 0]
+    biases = jnp.array([])
+
+    for i in range(num_coverage_samples):
+        key, sub_key = random.split(key)
+        t1_bounded = CustomPrior_t1.rvs(2., size=(1,), key=sub_key)
+        t1 = logit((t1_bounded + 2) / 4)
+
+        key, sub_key = random.split(key)
+        t2_bounded = CustomPrior_t2.rvs(t1_bounded, 1., size=(1,), key=sub_key)
+        t2 = logit((t2_bounded + 1) / 2)
+        theta_draw_original = jnp.column_stack([t1_bounded, t2_bounded])
+        theta_draw = jnp.column_stack([t1, t2])
+
+        theta_draw = (theta_draw - thetas_mean) / thetas_std
+
+        key, sub_key = random.split(sub_key)
+        x_draw = get_summaries_batches(sub_key, *theta_draw_original.T, n_obs=n_obs,
+                                       n_sims=1, batch_size=1)
+        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
+
+        posterior_samples_original = flow.sample(sub_key,
+                                                 sample_shape=(num_posterior_samples,),
+                                                 condition=x_draw)
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+        posterior_samples = jnp.squeeze(posterior_samples)
+        posterior_samples = posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
+        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
+        biases = jnp.concatenate((biases, bias.ravel()))
+        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                              x_draw)
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel())
+        pdf_theta = flow.log_prob(theta_draw, x_draw)
+
+        for i, level in enumerate(coverage_levels):
+            coverage_index = int(level * num_posterior_samples)
+            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+            if pdf_theta < pdf_posterior_sample:
+                coverage_levels_counts[i] += 1
+
+    print(coverage_levels_counts)
+    estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
+
+    with open(f"{dirname}coverage.txt", "w") as f:
+        f.write(f"{estimated_coverage}\n")
+
+    with open(f"{dirname}biases.txt", "w") as f:
+        f.write(f"{biases}\n")
+
     return kl, mmd
 
 
 if __name__ == '__main__':
-    run_ma2_identifiable()
+    parser = argparse.ArgumentParser(
+        prog="run_ma2_identifiable.py",
+        description="Run MA(2) model.",
+        epilog="Example usage: python run_ma2_identifiabl.py"
+    )
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n_obs", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=100_000)
+    args = parser.parse_args()
+    run_ma2_identifiable(args)

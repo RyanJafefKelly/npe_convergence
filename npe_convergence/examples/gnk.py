@@ -10,11 +10,13 @@ from jax.scipy.stats import norm
 from numpyro.infer import MCMC, NUTS  # type: ignore
 
 
+# @jit
 def gnk(z, A, B, g, k, c=0.8):
     """Quantile function for the g-and-k distribution."""
     return A + B * (1 + c * jnp.tanh(g * z / 2)) * (1 + z**2)**k * z
 
 
+# @jit
 def ss_octile(y):
     """Calculate octiles of the input data."""
     octiles = jnp.linspace(12.5, 87.5, 7)
@@ -25,6 +27,28 @@ def gnk_density(x, A, B, g, k, c=0.8):
     """Calculate the density of the g-and-k distribution."""
     z = pgk(x, A, B, g, k, c, zscale=True)
     return norm.pdf(z) / gnk_deriv(z, A, B, g, k, c)
+
+
+def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size):
+    num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
+    all_octiles = []
+
+    for i in range(num_batches):
+        sub_key, key = random.split(key)
+        z_batch = random.normal(sub_key, shape=(n_obs, batch_size))
+
+        A_batch = A[i * batch_size:(i + 1) * batch_size]
+        B_batch = B[i * batch_size:(i + 1) * batch_size]
+        g_batch = g[i * batch_size:(i + 1) * batch_size]
+        k_batch = k[i * batch_size:(i + 1) * batch_size]
+
+        x_batch = gnk(z_batch, A_batch, B_batch, g_batch, k_batch)
+        x_batch = x_batch.T
+
+        octiles_batch = ss_octile(x_batch)
+        all_octiles.append(octiles_batch)
+
+    return jnp.concatenate(all_octiles, axis=1)
 
 
 def gnk_deriv(z, A, B, g, k, c):

@@ -84,9 +84,9 @@ def get_model(n_obs=100, true_params=None, seed=None):
     if true_params is None:
         true_params = [100, 2, -0.1]
 
-    poisson_rate = elfi.Prior('uniform', 30, 170, model=m, name='poisson_rate')
-    pareto_scale = elfi.Prior('uniform', 0, 15, model=m, name='pareto_scale')
-    poisson_rate = elfi.Prior('uniform', -3, 6, model=m, name='pareto_rate')
+    elfi.Prior('uniform', 30, 170, model=m, name='poisson_rate')
+    elfi.Prior('uniform', 0, 15, model=m, name='pareto_scale')
+    elfi.Prior('uniform', -3, 6, model=m, name='pareto_rate')
 
     # simulation
     fn_simulator = partial(stereological_sim, n_obs=n_obs)

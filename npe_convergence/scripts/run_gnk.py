@@ -16,7 +16,7 @@ from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
 
-from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile
+from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile, get_summaries_batches
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
@@ -73,7 +73,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000  # TODO: see what can get away with for MMD
+    num_posterior_samples = 4_000  # TODO: see what can get away with for MMD
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -100,20 +100,25 @@ def run_gnk(*args, **kwargs):
 
     # TODO: SAMPLE PRIOR
     key, subkey = random.split(key)
-    thetas_bounded = dist.Uniform(0, 10).sample(subkey, (n_sims, 4))
+    tol = 1e-6  # NOTE: avoid infs when logit transform
+    thetas_bounded = dist.Uniform(0 + tol, 10 - tol).sample(subkey, (n_sims, 4))
     thetas_unbounded = logit(thetas_bounded / 10)
 
     A, B, g, k = thetas_bounded.T
 
     key, sub_key = random.split(key)
-    z = random.normal(sub_key, shape=(n_obs, n_sims))
+    # z = random.normal(sub_key, shape=(n_obs, n_sims))
 
-    x = gnk(z, A[None, :], B[None, :], g[None, :], k[None, :])
-    x = x.T  # TODO: shouldn't have to do this
+    batch_size = 1000
 
-    x_sims = ss_octile(x)
+    key, sub_key = random.split(key)
+    x_sims = get_summaries_batches(sub_key, A, B, g, k, n_obs, n_sims, batch_size=batch_size)
+    # x = gnk(z, A[None, :], B[None, :], g[None, :], k[None, :])
+    # x = x.T  # TODO: shouldn't have to do this
 
-    x_sims = jnp.array(x_sims)
+    # x_sims = ss_octile(x)
+
+    # x_sims = jnp.array(x_sims)
 
     thetas_mean = thetas_unbounded.mean(axis=0)
     thetas_std = thetas_unbounded.std(axis=0)
@@ -163,15 +168,14 @@ def run_gnk(*args, **kwargs):
     # plt.xlim(0, 1)
     # true_thetas = true_thetas.T  # TODO: ugly
     true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
-    for ii, (key, values) in enumerate(true_thetas.items()):
-        true_posterior_samples = true_posterior_samples.at[:, ii].set(values)
+    for ii, (k, v) in enumerate(true_thetas.items()):
+        true_posterior_samples = true_posterior_samples.at[:, ii].set(v)
         _, bins, _ = plt.hist(posterior_samples[:, ii], bins=50, alpha=0.8, label='NPE')
-        plt.hist(values, bins=bins, alpha=0.8, label='true')
+        plt.hist(v, bins=bins, alpha=0.8, label='true')
         plt.legend()
         plt.axvline(true_params[ii], color='black')
         plt.savefig(f'{dirname}posterior_samples_{ii}.pdf')
         plt.clf()
-
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
@@ -190,6 +194,56 @@ def run_gnk(*args, **kwargs):
     with open(f'{dirname}mmd.txt', 'w') as f:
         f.write(str(mmd))
 
+    num_coverage_samples = 100
+    coverage_levels = [0.8, 0.9, 0.95]
+    coverage_levels_counts = [0, 0, 0]
+    biases = jnp.array([])
+
+    for i in range(num_coverage_samples):
+        key, sub_key = random.split(key)
+        theta_draw_original = dist.Uniform(0, 10).sample(sub_key, (1, 4))
+
+        theta_draw = logit(theta_draw_original / 10)
+        theta_draw = (theta_draw - thetas_mean) / thetas_std
+
+        key, sub_key = random.split(key)
+        z = random.normal(sub_key, shape=(n_obs,))
+        x_draw_original = gnk(z, *theta_draw_original.ravel())
+        x_draw = jnp.atleast_2d(x_draw_original)
+        x_draw = ss_octile(x_draw)
+        x_draw = jnp.squeeze(x_draw)
+
+        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
+
+        posterior_samples_original = flow.sample(sub_key,
+                                                 sample_shape=(num_posterior_samples,),
+                                                 condition=x_draw)
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+        posterior_samples = jnp.squeeze(posterior_samples)
+        posterior_samples = expit(posterior_samples) * 10
+
+        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
+        biases = jnp.concatenate((biases, bias.ravel()))
+        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                              x_draw)
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel())
+        pdf_theta = flow.log_prob(theta_draw, x_draw)
+
+        for i, level in enumerate(coverage_levels):
+            coverage_index = int(level * num_posterior_samples)
+            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+            if pdf_theta < pdf_posterior_sample:
+                coverage_levels_counts[i] += 1
+
+    print(coverage_levels_counts)
+    estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
+
+    with open(f"{dirname}coverage.txt", "w") as f:
+        f.write(f"{estimated_coverage}\n")
+
+    with open(f"{dirname}biases.txt", "w") as f:
+        f.write(f"{biases}\n")
+
     return kl, mmd
 
 
@@ -201,7 +255,7 @@ if __name__ == "__main__":
         epilog="Example usage: python run_gnk.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=5_000)
-    parser.add_argument("--n_sims", type=int, default=100_000)
+    parser.add_argument("--n_obs", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=30_000)
     args = parser.parse_args()
     run_gnk(args)

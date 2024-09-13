@@ -13,6 +13,7 @@ from flowjax.train.data_fit import fit_to_data  # type: ignore
 
 from npe_convergence.examples.stereological import (get_prior_samples,
                                                     get_summaries,
+                                                    get_summaries_batches,
                                                     stereological,
                                                     transform_to_bounded,
                                                     transform_to_unbounded)
@@ -45,9 +46,11 @@ def run_stereological(*args, **kwargs):
     thetas = get_prior_samples(subkey, n_sims)
 
     key, subkey = random.split(key)
-    # TODO: BATCHING
-    sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
-    sim_summ_data = get_summaries(sim_data)
+    # # TODO: BATCHING
+    # sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
+    # sim_summ_data = get_summaries(sim_data)
+    batch_size = 1_000
+    sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims, batch_size)
 
     thetas = transform_to_unbounded(thetas)
 
@@ -94,7 +97,7 @@ def run_stereological(*args, **kwargs):
     # standardise y_obs
     y_obs = (y_obs - sim_summ_data_mean) / sim_summ_data_std
 
-    num_posterior_samples = 5_000
+    num_posterior_samples = 4_000
     posterior_samples = flow.sample(sub_key,
                                     sample_shape=(num_posterior_samples,),
                                     condition=y_obs)
@@ -145,10 +148,9 @@ def run_stereological(*args, **kwargs):
         posterior_samples_original = flow.sample(sub_key,
                                                  sample_shape=(num_posterior_samples,),
                                                  condition=x_draw)
-        posterior_samples = (posterior_samples * thetas_std) + thetas_mean
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
         posterior_samples = jnp.squeeze(posterior_samples)
         posterior_samples = transform_to_bounded(posterior_samples)
-
         bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
         biases = jnp.concatenate((biases, bias.ravel()))
         pdf_posterior_samples = flow.log_prob(posterior_samples_original,
@@ -205,8 +207,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_stereological.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=500)
-    parser.add_argument("--n_sims", type=int, default=10_000)
+    parser.add_argument("--n_obs", type=int, default=100)
+    parser.add_argument("--n_sims", type=int, default=5_000)
     args = parser.parse_args()
 
     run_stereological(args)
