@@ -13,7 +13,7 @@ def run_gnk_experiments(args):
 
 
 if __name__ == "__main__":
-    numpyro.set_host_device_count(4)
+    # numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
         prog="run_gnk_experiments.py",
         description="Run experiments for gnk model.",

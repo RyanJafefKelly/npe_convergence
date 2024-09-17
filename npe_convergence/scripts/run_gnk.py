@@ -29,7 +29,7 @@ def run_gnk(*args, **kwargs):
         seed = args.seed
         n_obs = args.n_obs
         n_sims = args.n_sims
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
+    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
@@ -50,7 +50,7 @@ def run_gnk(*args, **kwargs):
     x_obs = jnp.atleast_2d(x_obs)
     x_obs = ss_octile(x_obs)
     x_obs = jnp.squeeze(x_obs)
-    x_obs_original = x_obs.copy()
+    # x_obs_original = x_obs.copy()
     print("x_obs: ", x_obs)
 
     # num_prior_pred_samples = 10_000
@@ -109,7 +109,7 @@ def run_gnk(*args, **kwargs):
     key, sub_key = random.split(key)
     # z = random.normal(sub_key, shape=(n_obs, n_sims))
 
-    batch_size = 1000
+    batch_size = min(1000, n_sims)
 
     key, sub_key = random.split(key)
     x_sims = get_summaries_batches(sub_key, A, B, g, k, n_obs, n_sims, batch_size=batch_size)
@@ -162,8 +162,8 @@ def run_gnk(*args, **kwargs):
     plt.clf()
     key, sub_key = random.split(key)
 
-    posterior_samples = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
-    posterior_samples = (posterior_samples * thetas_std) + thetas_mean
+    posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
+    posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
     posterior_samples = expit(posterior_samples) * 10
     # plt.xlim(0, 1)
     # true_thetas = true_thetas.T  # TODO: ugly
@@ -196,6 +196,28 @@ def run_gnk(*args, **kwargs):
 
     num_coverage_samples = 100
     coverage_levels = [0.8, 0.9, 0.95]
+
+    # bias/coverage for true parameter
+    true_params_unbounded = logit(true_params / 10)
+    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
+    bias = jnp.mean(posterior_samples, axis=0) - true_params
+    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                          x_obs)
+    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(), descending=True)
+    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
+    true_in_credible_interval = [0, 0, 0]
+    for i, level in enumerate(coverage_levels):
+        coverage_index = int(level * num_posterior_samples)
+        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+        if pdf_theta > pdf_posterior_sample:
+            true_in_credible_interval[i] = 1
+
+    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
+        f.write(f"{true_in_credible_interval}\n")
+
+    with open(f"{dirname}true_bias.txt", "w") as f:
+        f.write(f"{bias}\n")
+
     coverage_levels_counts = [0, 0, 0]
     biases = jnp.array([])
 
@@ -226,13 +248,14 @@ def run_gnk(*args, **kwargs):
         biases = jnp.concatenate((biases, bias.ravel()))
         pdf_posterior_samples = flow.log_prob(posterior_samples_original,
                                               x_draw)
-        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel())
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                         descending=True)
         pdf_theta = flow.log_prob(theta_draw, x_draw)
 
         for i, level in enumerate(coverage_levels):
             coverage_index = int(level * num_posterior_samples)
             pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-            if pdf_theta < pdf_posterior_sample:
+            if pdf_theta > pdf_posterior_sample:
                 coverage_levels_counts[i] += 1
 
     print(coverage_levels_counts)
@@ -254,8 +277,8 @@ if __name__ == "__main__":
         description="Run gnk model.",
         epilog="Example usage: python run_gnk.py"
     )
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=30_000)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=5_000_000)
     args = parser.parse_args()
     run_gnk(args)
