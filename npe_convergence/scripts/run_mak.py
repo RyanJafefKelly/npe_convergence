@@ -53,7 +53,7 @@ def run_mak(*args, **kwargs):
 
     x_obs_original = x_obs.copy()
 
-    num_posterior_samples = 4_000
+    num_posterior_samples = 10_000
     num_warmup = 10_000
     # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)

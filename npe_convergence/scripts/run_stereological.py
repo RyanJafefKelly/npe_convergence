@@ -97,7 +97,7 @@ def run_stereological(*args, **kwargs):
     # standardise x_obs
     x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
 
-    num_posterior_samples = 4_000
+    num_posterior_samples = 10_000
     posterior_samples_original = flow.sample(sub_key,
                                              sample_shape=(num_posterior_samples,),
                                              condition=x_obs)

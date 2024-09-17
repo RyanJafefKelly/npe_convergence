@@ -39,7 +39,7 @@ def run_ma2_identifiable(*args, **kwargs):
 
     key, sub_key = random.split(key)
 
-    num_posterior_samples = 4_000
+    num_posterior_samples = 10_000
 
     nuts_kernel = NUTS(numpyro_model)
     thinning = 10
