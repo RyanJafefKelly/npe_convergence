@@ -35,13 +35,13 @@ def run_stereological(*args, **kwargs):
     key = random.PRNGKey(seed)
     true_params = jnp.array([100, 2, -0.1])  # TODO? fixed here ... doesn't matter
     # x_mat = sio.loadmat("npe_convergence/data/data_stereo_real.mat")
-    # y_obs = jnp.array(x_mat["y"])
-    # y_obs = get_summaries(y_obs)
+    # x_obs = jnp.array(x_mat["y"])
+    # x_obs = get_summaries(x_obs)
     key, subkey = random.split(key)
-    y_obs = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
-    y_obs = get_summaries(y_obs)
-    y_obs_original = y_obs.copy()
-    print('y_obs: ', y_obs)
+    x_obs = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
+    x_obs = get_summaries(x_obs)
+    x_obs_original = x_obs.copy()
+    print('x_obs: ', x_obs)
     key, subkey = random.split(key)
     thetas = get_prior_samples(subkey, n_sims)
 
@@ -49,7 +49,7 @@ def run_stereological(*args, **kwargs):
     # # TODO: BATCHING
     # sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
     # sim_summ_data = get_summaries(sim_data)
-    batch_size = 1_000
+    batch_size = min(1000, n_sims)
     sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims, batch_size)
 
     thetas = transform_to_unbounded(thetas)
@@ -94,14 +94,14 @@ def run_stereological(*args, **kwargs):
     plt.savefig('losses.pdf')
     plt.clf()
 
-    # standardise y_obs
-    y_obs = (y_obs - sim_summ_data_mean) / sim_summ_data_std
+    # standardise x_obs
+    x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
 
     num_posterior_samples = 4_000
-    posterior_samples = flow.sample(sub_key,
-                                    sample_shape=(num_posterior_samples,),
-                                    condition=y_obs)
-    posterior_samples = (posterior_samples * thetas_std) + thetas_mean
+    posterior_samples_original = flow.sample(sub_key,
+                                             sample_shape=(num_posterior_samples,),
+                                             condition=x_obs)
+    posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
     posterior_samples = jnp.squeeze(posterior_samples)
     posterior_samples = transform_to_bounded(posterior_samples)
     plt.hist(posterior_samples[:, 0], bins=50)
@@ -122,13 +122,36 @@ def run_stereological(*args, **kwargs):
     plt.savefig(f'{dirname}t3_posterior.pdf')
     plt.clf()
 
-    y_obs_original = jnp.squeeze(y_obs_original)
+    x_obs_original = jnp.squeeze(x_obs_original)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
     num_coverage_samples = 100
     coverage_levels = [0.8, 0.9, 0.95]
+
+    # bias/coverage for true parameter
+    true_params_unbounded = transform_to_unbounded(jnp.atleast_2d(true_params))
+    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
+    bias = jnp.mean(posterior_samples, axis=0) - true_params
+    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                          x_obs)
+    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                     descending=True)
+    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
+    true_in_credible_interval = [0, 0, 0]
+    for i, level in enumerate(coverage_levels):
+        coverage_index = int(level * num_posterior_samples)
+        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+        if pdf_theta > pdf_posterior_sample:
+            true_in_credible_interval[i] = 1
+
+    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
+        f.write(f"{true_in_credible_interval}\n")
+
+    with open(f"{dirname}true_bias.txt", "w") as f:
+        f.write(f"{bias}\n")
+
     coverage_levels_counts = [0, 0, 0]
     biases = jnp.array([])
 
@@ -177,22 +200,22 @@ def run_stereological(*args, **kwargs):
     # ppc_summaries = get_summaries(ppc_samples)
     # ppc_summaries = jnp.squeeze(ppc_summaries)
     # plt.hist(ppc_summaries[:, 0], bins=50)
-    # plt.axvline(y_obs_original[0], color='red')
+    # plt.axvline(x_obs_original[0], color='red')
     # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simnum_inclusions_posterior_stereo_npe_sim.pdf')
     # plt.clf()
 
     # plt.hist(ppc_summaries[:, 1], bins=50)
-    # plt.axvline(y_obs_original[1], color='red')
+    # plt.axvline(x_obs_original[1], color='red')
     # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmin_inclusions_posterior_stereo_npe_sim.pdf')
     # plt.clf()
 
     # plt.hist(ppc_summaries[:, 2], bins=50)
-    # plt.axvline(y_obs_original[2], color='red')
+    # plt.axvline(x_obs_original[2], color='red')
     # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmean_inclusions_posterior_stereo_npe_sim.pdf')
     # plt.clf()
 
     # plt.hist(ppc_summaries[:, 3], bins=50)
-    # plt.axvline(y_obs_original[3], color='red')
+    # plt.axvline(x_obs_original[3], color='red')
     # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmax_inclusions_posterior_stereo_npe_sim.pdf')
     # plt.clf()
 
