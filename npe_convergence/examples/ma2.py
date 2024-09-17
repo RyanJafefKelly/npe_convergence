@@ -172,27 +172,23 @@ class CustomPrior_t2:
 
 
 def numpyro_model(obs, a=2, n_obs=100):
+    ma_order = 2
     t1 = numpyro.sample('t1', dist.Uniform(-a, a))
     locs = jnp.maximum(-a - t1, -a + t1)
     scales = a - locs
     t2 = numpyro.sample('t2', dist.Uniform(locs, locs + scales))
+    thetas = jnp.array([t1, t2])
+    y_variance = numpyro.deterministic(
+        "y_variance",
+        jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
+                   for k in range(0, ma_order+1)])
+    )
 
-    # n_key = numpyro.prng_key()
-    # sub_key = n_key if n_key is not None else w_key
+    mean = numpyro.deterministic(
+        "mean",
+        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
+    )
 
-    # w = random.normal(sub_key, (n_obs + 2,))
-    # w = numpyro.sample('w', dist.Normal(0, 1).expand([n_obs + 2]), obs=None)
-    # x = w[2:] + t1 * w[1:-1] + t2 * w[:-2]
+    stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
 
-    # var = jnp.var(x)
-    # autocov1 = jnp.mean(x[1:] * x[:-1])  # TODO: confirm (could use numpyro.deterministic)
-    # autocov2 = jnp.mean(x[2:] * x[:-2])
-    # numpyro.deterministic('autocov', jnp.array([autocov1, autocov2]))
-
-    # TODO!!! HOW SET NORMAL VAR FOR EXACT? DOES IT MATTER?
-    # variance_scale = 1 / jnp.sqrt(n_obs)  # TODO: CLT / SIMILAR JUSTIFICATION?
-    thetas = jnp.array([t1, t2])  # TODO: MAKE GENERAL
-    y_variance = [sample_autocov_variance(thetas, k, n_obs, len(thetas)) for k in range(len(obs))]
-
-    for i in range(len(y_variance)):
-        numpyro.sample(f'obs_{i}', dist.Normal(autocov_exact(thetas, i, len(thetas)), jnp.sqrt(y_variance[i])), obs=obs[i])
+    numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)

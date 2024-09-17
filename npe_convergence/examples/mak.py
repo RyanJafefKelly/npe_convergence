@@ -122,9 +122,47 @@ def get_summaries(sim_data, ma_order):
     return sim_summ_data[:, 1:]  # TODO: lazy way of testing removal of sample var
 
 
+def get_summaries_batches(key, thetas, n_obs, n_sims, batch_size):
+    """Process simulations in batches to save memory.
+
+    Args:
+        key (random.PRNGKey): PRNG key
+        thetas (jnp.ndarray): Array of shape (n_sims, ma_order)
+        n_obs (int): Number of observations per simulation
+        n_sims (int): Total number of simulations
+        batch_size (int): Number of simulations per batch
+
+    Returns:
+        jnp.ndarray: Summaries for all simulations of shape (n_sims, ma_order)
+    """
+    num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
+    all_summaries = []
+    ma_order = thetas.shape[1]
+
+    for i in range(num_batches):
+        # Update key for randomness
+        sub_key, key = random.split(key)
+        batch_size_i = min(batch_size, n_sims - i * batch_size)
+
+        # Extract batch parameters
+        thetas_batch = thetas[i * batch_size: i * batch_size + batch_size_i]
+
+        # Simulate data for the batch
+        sim_data_batch = MAK(sub_key, thetas_batch, n_obs=n_obs)
+
+        # Compute summaries for the batch
+        sim_summ_data_batch = get_summaries(sim_data_batch, ma_order)
+
+        # Collect summaries
+        all_summaries.append(sim_summ_data_batch)
+
+    # Concatenate all summaries
+    return jnp.concatenate(all_summaries, axis=0)
+
+
 def numpyro_model(obs, a=1, n_obs=100):
     summary_length = len(obs.ravel())
-    ma_order = summary_length  #  - 1  # TODO: TESTING
+    ma_order = summary_length
     # thetas = numpyro.sample("thetas", MAIdentifiablePrior(ma_order))
     thetas = numpyro.sample('thetas', dist.Uniform(-a, a).expand([ma_order]))
 

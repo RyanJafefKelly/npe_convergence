@@ -9,15 +9,18 @@ import jax.numpy as jnp
 import jax.random as random
 import matplotlib.pyplot as plt
 import numpyro  # type: ignore
+import numpyro.distributions as dist  # type: ignore
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
-from numpyro.infer import ESS, MCMC, NUTS  # type: ignore  # , ESS
+from numpyro.infer import ESS, MCMC  # type: ignore
 
 from npe_convergence.examples.mak import (MAK, generate_valid_samples,
-                                          get_summaries, numpyro_model)
+                                          get_summaries,
+                                          get_summaries_batches,
+                                          numpyro_model)
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
@@ -45,14 +48,14 @@ def run_mak(*args, **kwargs):
     # true_params = true_params[::-1]  # NOTE: reverse the order
     print("true_params: ", true_params)
     key, sub_key = random.split(key)
-    y_obs = MAK(sub_key, true_params, n_obs=n_obs)
-    y_obs = get_summaries(y_obs, ma_order)
+    x_obs = MAK(sub_key, true_params, n_obs=n_obs)
+    x_obs = get_summaries(x_obs, ma_order)
 
-    y_obs_original = y_obs.copy()
+    x_obs_original = x_obs.copy()
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 4_000
     num_warmup = 10_000
-    nuts_kernel = NUTS(numpyro_model)
+    # nuts_kernel = NUTS(numpyro_model)
     ess_kernel = ESS(numpyro_model)
     thinning = 10
     num_chains = 2 * ma_order
@@ -69,7 +72,7 @@ def run_mak(*args, **kwargs):
     init_params = init_params + random.normal(sub_key, init_params.shape) * 0.1
     init_params = {'thetas': init_params}
     mcmc.run(random.PRNGKey(1),
-             y_obs_original,
+             x_obs_original,
              init_params=init_params,
              n_obs=n_obs)
     mcmc.print_summary()
@@ -95,8 +98,8 @@ def run_mak(*args, **kwargs):
     thetas = logit((thetas_bounded + 1) / 2)
 
     key, sub_key = random.split(key)
-    sim_data = MAK(sub_key, thetas_bounded, n_obs=n_obs, batch_size=n_sims)
-    sim_summ_data = get_summaries(sim_data, ma_order)
+    batch_size = min(1000, n_sims)
+    sim_summ_data = get_summaries_batches(key, thetas_bounded, n_obs, n_sims, batch_size)
 
     thetas_mean = thetas.mean(axis=0)
     thetas_std = thetas.std(axis=0)
@@ -106,7 +109,7 @@ def run_mak(*args, **kwargs):
     sim_summ_data_std = sim_summ_data.std(axis=0)
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
 
-    y_obs = (y_obs - sim_summ_data_mean) / sim_summ_data_std
+    x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
 
     key, sub_key = random.split(key)
     theta_dims = ma_order
@@ -142,8 +145,8 @@ def run_mak(*args, **kwargs):
 
     key, sub_key = random.split(key)
 
-    posterior_samples = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=y_obs)
-    posterior_samples = (posterior_samples * thetas_std) + thetas_mean
+    posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
+    posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
 
     posterior_samples = expit(posterior_samples) * 2 - 1
 
@@ -175,6 +178,79 @@ def run_mak(*args, **kwargs):
     with open(f'{dirname}mmd.txt', 'w') as f:
         f.write(str(mmd))
 
+    # TODO: coverage
+    num_coverage_samples = 100
+    coverage_levels = [0.8, 0.9, 0.95]
+
+    # bias/coverage for true parameter
+    true_params_unbounded = logit((true_params + 1) / 2)
+    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
+    bias = jnp.mean(posterior_samples, axis=0) - true_params
+    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                          x_obs)
+    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                     descending=True)
+    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
+    true_in_credible_interval = [0, 0, 0]
+    for i, level in enumerate(coverage_levels):
+        coverage_index = int(level * num_posterior_samples)
+        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+        if pdf_theta > pdf_posterior_sample:
+            true_in_credible_interval[i] = 1
+
+    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
+        f.write(f"{true_in_credible_interval}\n")
+
+    with open(f"{dirname}true_bias.txt", "w") as f:
+        f.write(f"{bias}\n")
+
+    coverage_levels_counts = [0, 0, 0]
+    biases = jnp.array([])
+
+    for i in range(num_coverage_samples):
+        key, sub_key = random.split(key)
+        theta_draw_original = dist.Uniform(-1, 1).sample(sub_key, (1, ma_order))
+
+        theta_draw = logit((theta_draw_original+1) / 2)
+        theta_draw = (theta_draw - thetas_mean) / thetas_std
+
+        key, sub_key = random.split(key)
+        x_draw = get_summaries_batches(sub_key, theta_draw_original,
+                                       n_obs=n_obs, n_sims=1, batch_size=1)
+        # x_draw = jnp.squeeze(x_draw)
+
+        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
+
+        posterior_samples_original = flow.sample(sub_key,
+                                                 sample_shape=(num_posterior_samples,),
+                                                 condition=x_draw)
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+        posterior_samples = jnp.squeeze(posterior_samples)
+        posterior_samples = expit(2*posterior_samples - 1)
+
+        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
+        biases = jnp.concatenate((biases, bias.ravel()))
+        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                              x_draw)
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                         descending=True)
+        pdf_theta = flow.log_prob(theta_draw, x_draw)
+
+        for i, level in enumerate(coverage_levels):
+            coverage_index = int(level * num_posterior_samples)
+            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+            if pdf_theta > pdf_posterior_sample:
+                coverage_levels_counts[i] += 1
+
+    print(coverage_levels_counts)
+    estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
+
+    with open(f"{dirname}coverage.txt", "w") as f:
+        f.write(f"{estimated_coverage}\n")
+
+    with open(f"{dirname}biases.txt", "w") as f:
+        f.write(f"{biases}\n")
+
     return kl, mmd
 
 
@@ -185,9 +261,9 @@ if __name__ == "__main__":
         description="Run MA of order k model.",
         epilog="Example usage: python run_mak.py"
     )
-    parser.add_argument("--seed", type=int, default=15)
-    parser.add_argument("--n_obs", type=int, default=1000)
-    parser.add_argument("--n_sims", type=int, default=100_000)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n_obs", type=int, default=500)
+    parser.add_argument("--n_sims", type=int, default=30_000)
     parser.add_argument("--ma_order", type=int, default=6)
     args = parser.parse_args()
     run_mak(args)
