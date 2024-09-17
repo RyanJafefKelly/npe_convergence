@@ -16,18 +16,18 @@ def run_experiment(experiment_fn, seed: int = 0, **kwargs):
 
     for jj, f in enumerate(n_sims):
         for ii, n in enumerate(n_obs):
-            if f(n) > 500_000:  # TODO: HACKY FIX ... try to fix large memory issues with batching
-                continue
-            else:
-                try:
-                    kl, mmd = experiment_fn(seed, n, f(n), **kwargs)
-                except ValueError as e:
-                    kl = None
-                    mmd = None
-                    print(f"Error: {e}")
-                print(f"n_obs: {n}, n_sims: {f(n)}, kl: {kl}, mmd: {mmd}")
-                kl_mat[ii, jj] = kl
-                mmd_mat[ii, jj] = mmd
+            # if f(n) > 500_000:  # TODO: HACKY FIX ... try to fix large memory issues with batching
+            #     continue
+            # else:
+            try:
+                kl, mmd = experiment_fn(seed, n, f(n), **kwargs)
+            except ValueError as e:
+                kl = None
+                mmd = None
+                print(f"Error: {e}")
+            print(f"n_obs: {n}, n_sims: {f(n)}, kl: {kl}, mmd: {mmd}")
+            kl_mat[ii, jj] = kl
+            mmd_mat[ii, jj] = mmd
     return None
 
 
