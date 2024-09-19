@@ -49,7 +49,7 @@ def run_stereological(*args, **kwargs):
     # # TODO: BATCHING
     # sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
     # sim_summ_data = get_summaries(sim_data)
-    batch_size = min(1000, n_sims)
+    batch_size = min(100, n_sims)
     sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims, batch_size)
 
     thetas = transform_to_unbounded(thetas)
@@ -178,13 +178,14 @@ def run_stereological(*args, **kwargs):
         biases = jnp.concatenate((biases, bias.ravel()))
         pdf_posterior_samples = flow.log_prob(posterior_samples_original,
                                               x_draw)
-        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel())
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                         descending=True)
         pdf_theta = flow.log_prob(theta_draw, x_draw)
 
         for i, level in enumerate(coverage_levels):
             coverage_index = int(level * num_posterior_samples)
             pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-            if pdf_theta < pdf_posterior_sample:
+            if pdf_theta > pdf_posterior_sample:
                 coverage_levels_counts[i] += 1
 
     print(coverage_levels_counts)
@@ -230,8 +231,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_stereological.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=100)
-    parser.add_argument("--n_sims", type=int, default=5_000)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=33_214)
     args = parser.parse_args()
 
     run_stereological(args)
