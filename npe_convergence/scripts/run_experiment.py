@@ -4,7 +4,7 @@ import numpy as np
 
 
 def run_experiment(experiment_fn, seed: int = 0, **kwargs):
-    n_obs = [100, 500, 1000, 5000, 10_000]
+    n_obs = [100, 500, 1000, 5000]
 
     n_sims = [lambda n: n,
               lambda n: int(n * math.log(n)),
