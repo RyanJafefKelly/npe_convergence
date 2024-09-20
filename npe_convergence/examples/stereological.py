@@ -2,8 +2,8 @@
 
 import jax.numpy as jnp
 import jax.random as random
-import numpy as np
-import scipy.stats as ss  # type: ignore
+# import numpy as np
+# import scipy.stats as ss  # type: ignore
 from jax.scipy.special import expit, logit
 
 
@@ -31,36 +31,87 @@ def get_prior_samples(key, num_samples: int):
                              pareto_shape_samples])
 
 
+# def stereological(key, poisson_rate, pareto_scale, pareto_shape, n_obs=100, num_samples=1):
+#     # In 1D real-line, time between arrivals follows exponential distribution
+#     v_0 = 5  # CONSTANT
+#     key, subkey = random.split(key)
+#     poisson_rate = jnp.atleast_1d(poisson_rate)
+#     pareto_shape = jnp.atleast_1d(pareto_shape)
+#     pareto_scale = jnp.atleast_1d(pareto_scale)
+
+#     number_locs = random.poisson(subkey, poisson_rate[:, np.newaxis], shape=(num_samples, n_obs))
+#     numpy_seed = random.randint(subkey, shape=(1,), minval=0, maxval=(1 << 31) - 1)[0]
+#     rng = np.random.default_rng(int(numpy_seed))
+
+#     pareto_samples = np.empty((num_samples, n_obs, number_locs.max(), 3))
+#     for i in range(num_samples):
+#         for j in range(n_obs):
+#             pareto_samples[i, j, :int(number_locs[i, j]), :] = ss.genpareto.rvs(
+#                 pareto_shape[i], scale=pareto_scale[i], size=(int(number_locs[i, j]), 3), random_state=rng)
+
+#     pareto_samples = jnp.max(pareto_samples, axis=-1)
+#     pareto_samples = pareto_samples + v_0  # TODO! CHECK
+
+#     key, subkey = random.split(key)
+#     unif_sample = random.uniform(subkey, (num_samples, n_obs, jnp.max(number_locs), 2))
+#     V1 = (pareto_samples - v_0) * unif_sample[..., 0] * pareto_samples + v_0
+#     V2 = (pareto_samples - v_0) * unif_sample[..., 1] * pareto_samples + v_0
+#     V_tmp = np.maximum(V1, V2)
+#     for i in range(num_samples):
+#         for j in range(n_obs):
+#             V_tmp[i, j, int(number_locs[i, j]):] = np.nan
+#     return jnp.array(V_tmp)
+
+
 def stereological(key, poisson_rate, pareto_scale, pareto_shape, n_obs=100, num_samples=1):
-    # In 1D real-line, time between arrivals follows exponential distribution
     v_0 = 5  # CONSTANT
     key, subkey = random.split(key)
     poisson_rate = jnp.atleast_1d(poisson_rate)
     pareto_shape = jnp.atleast_1d(pareto_shape)
     pareto_scale = jnp.atleast_1d(pareto_scale)
 
-    number_locs = random.poisson(subkey, poisson_rate[:, np.newaxis], shape=(num_samples, n_obs))
-    numpy_seed = random.randint(subkey, shape=(1,), minval=0, maxval=(1 << 31) - 1)[0]
-    rng = np.random.default_rng(int(numpy_seed))
+    # Generate number of locations
+    number_locs = random.poisson(subkey, poisson_rate[:, None], shape=(num_samples, n_obs))
+    max_number_locs = int(jnp.max(number_locs))
 
-    pareto_samples = np.empty((num_samples, n_obs, number_locs.max(), 3))
-    for i in range(num_samples):
-        for j in range(n_obs):
-            pareto_samples[i, j, :int(number_locs[i, j]), :] = ss.genpareto.rvs(
-                pareto_shape[i], scale=pareto_scale[i], size=(int(number_locs[i, j]), 3), random_state=rng)
-
-    pareto_samples = jnp.max(pareto_samples, axis=-1)
-    pareto_samples = pareto_samples + v_0  # TODO! CHECK
-
+    # Generate Pareto samples
     key, subkey = random.split(key)
-    unif_sample = random.uniform(subkey, (num_samples, n_obs, jnp.max(number_locs), 2))
+    U_pareto = random.uniform(subkey, shape=(num_samples, n_obs, max_number_locs, 3))
+
+    c = pareto_shape[:, None, None, None]
+    scale = pareto_scale[:, None, None, None]
+
+    def genpareto_rvs(U, c, scale):
+        return jnp.where(
+            c != 0,
+            scale * ((1 - U) ** (-c) - 1) / c,
+            scale * (-jnp.log(1 - U))
+        )
+
+    pareto_samples = genpareto_rvs(U_pareto, c, scale)
+
+    # Mask out invalid samples
+    locs_mask = jnp.arange(max_number_locs)[None, None, :, None] < number_locs[:, :, None, None]
+    pareto_samples = jnp.where(locs_mask, pareto_samples, -jnp.inf)
+
+    # Compute the maximum over the last axis
+    pareto_samples = jnp.max(pareto_samples, axis=-1) + v_0
+
+    # Generate uniform samples
+    key, subkey = random.split(key)
+    unif_sample = random.uniform(subkey, shape=(num_samples, n_obs, max_number_locs, 2))
+
+    # Compute V1 and V2 without extra dimensions
     V1 = (pareto_samples - v_0) * unif_sample[..., 0] * pareto_samples + v_0
     V2 = (pareto_samples - v_0) * unif_sample[..., 1] * pareto_samples + v_0
-    V_tmp = np.maximum(V1, V2)
-    for i in range(num_samples):
-        for j in range(n_obs):
-            V_tmp[i, j, int(number_locs[i, j]):] = np.nan
-    return jnp.array(V_tmp)
+
+    V_tmp = jnp.maximum(V1, V2)
+
+    # Apply the mask to V_tmp
+    mask = locs_mask[..., 0]
+    V_tmp = jnp.where(mask, V_tmp, jnp.nan)
+
+    return V_tmp
 
 
 def get_summaries(x):
@@ -92,9 +143,9 @@ def get_summaries_batches(key, thetas, n_obs, n_sims, batch_size):
     for i in range(num_batches):
         sub_key, key = random.split(key)
         batch_size_i = min(batch_size, n_sims - i * batch_size)
-        poisson_rate_batch = poisson_rate[i * batch_size:(i + 1) * batch_size]
-        pareto_scale_batch = pareto_scale[i * batch_size:(i + 1) * batch_size]
-        pareto_shape_batch = pareto_shape[i * batch_size:(i + 1) * batch_size]
+        poisson_rate_batch = poisson_rate[i * batch_size: i * batch_size + batch_size_i]
+        pareto_scale_batch = pareto_scale[i * batch_size: i * batch_size + batch_size_i]
+        pareto_shape_batch = pareto_shape[i * batch_size: i * batch_size + batch_size_i]
 
         sim_data_batch = stereological(sub_key, poisson_rate_batch, pareto_scale_batch, pareto_shape_batch, n_obs=n_obs, num_samples=batch_size_i)
         sim_summ_data_batch = get_summaries(sim_data_batch)
