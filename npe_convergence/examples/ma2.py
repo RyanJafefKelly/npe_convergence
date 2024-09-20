@@ -117,8 +117,8 @@ def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size):
         batch_size_i = min(batch_size, n_sims - i * batch_size)
 
         # Extract batch parameters
-        t1_batch = t1[i * batch_size : i * batch_size + batch_size_i]
-        t2_batch = t2[i * batch_size : i * batch_size + batch_size_i]
+        t1_batch = t1[i * batch_size: i * batch_size + batch_size_i]
+        t2_batch = t2[i * batch_size: i * batch_size + batch_size_i]
 
         # Run simulations for the batch
         sim_data_batch = MA2(t1_batch, t2_batch, n_obs=n_obs, batch_size=batch_size_i, key=sub_key)
