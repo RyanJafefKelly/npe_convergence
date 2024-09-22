@@ -35,12 +35,14 @@ def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size):
 
     for i in range(num_batches):
         sub_key, key = random.split(key)
-        z_batch = random.normal(sub_key, shape=(n_obs, batch_size))
+        batch_size_i = min(batch_size, n_sims - i * batch_size)
 
-        A_batch = A[i * batch_size:(i + 1) * batch_size]
-        B_batch = B[i * batch_size:(i + 1) * batch_size]
-        g_batch = g[i * batch_size:(i + 1) * batch_size]
-        k_batch = k[i * batch_size:(i + 1) * batch_size]
+        z_batch = random.normal(sub_key, shape=(n_obs, batch_size_i))
+
+        A_batch = A[i * batch_size: i * batch_size + batch_size_i]
+        B_batch = B[i * batch_size: i * batch_size + batch_size_i]
+        g_batch = g[i * batch_size: i * batch_size + batch_size_i]
+        k_batch = k[i * batch_size: i * batch_size + batch_size_i]
 
         x_batch = gnk(z_batch, A_batch, B_batch, g_batch, k_batch)
         x_batch = x_batch.T

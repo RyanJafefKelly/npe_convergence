@@ -275,10 +275,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="run_gnk.py",
         description="Run gnk model.",
-        epilog="Example usage: python run_gnk.py"
+        epilog="Example usage: terpython run_gnk.py"
     )
-    parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--n_obs", type=int, default=5_000)
-    parser.add_argument("--n_sims", type=int, default=5_000_000)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n_obs", type=int, default=500)
+    parser.add_argument("--n_sims", type=int, default=11823)
     args = parser.parse_args()
     run_gnk(args)

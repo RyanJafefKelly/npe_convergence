@@ -49,7 +49,7 @@ def run_stereological(*args, **kwargs):
     # # TODO: BATCHING
     # sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
     # sim_summ_data = get_summaries(sim_data)
-    batch_size = min(100, n_sims)
+    batch_size = min(50, n_sims)
     sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims, batch_size)
 
     thetas = transform_to_unbounded(thetas)
@@ -231,8 +231,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_stereological.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=5_000)
-    parser.add_argument("--n_sims", type=int, default=33_214)
+    parser.add_argument("--n_obs", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=1_000)
     args = parser.parse_args()
 
     run_stereological(args)
