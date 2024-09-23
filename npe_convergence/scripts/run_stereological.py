@@ -91,7 +91,7 @@ def run_stereological(*args, **kwargs):
 
     plt.plot(losses['train'], label='train')
     plt.plot(losses['val'], label='val')
-    plt.savefig('losses.pdf')
+    plt.savefig(f'{dirname}losses.pdf')
     plt.clf()
 
     # standardise x_obs
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=12345)
     args = parser.parse_args()
 
     run_stereological(args)
