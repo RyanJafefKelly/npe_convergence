@@ -10,6 +10,7 @@ from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
+import scipy.io as sio
 
 from npe_convergence.examples.stereological import (get_prior_samples,
                                                     get_summaries,
@@ -34,12 +35,12 @@ def run_stereological(*args, **kwargs):
 
     key = random.PRNGKey(seed)
     true_params = jnp.array([100, 2, -0.1])  # TODO? fixed here ... doesn't matter
-    # x_mat = sio.loadmat("npe_convergence/data/data_stereo_real.mat")
-    # x_obs = jnp.array(x_mat["y"])
-    # x_obs = get_summaries(x_obs)
-    key, subkey = random.split(key)
-    x_obs = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
+    x_mat = sio.loadmat("npe_convergence/data/data_stereo_real.mat")
+    x_obs = jnp.array(x_mat["y"])
     x_obs = get_summaries(x_obs)
+    # key, subkey = random.split(key)
+    # x_obs = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
+    # x_obs = get_summaries(x_obs)
     x_obs_original = x_obs.copy()
     print('x_obs: ', x_obs)
     key, subkey = random.split(key)
@@ -91,7 +92,7 @@ def run_stereological(*args, **kwargs):
 
     plt.plot(losses['train'], label='train')
     plt.plot(losses['val'], label='val')
-    plt.savefig(f'{dirname}losses.pdf')
+    plt.savefig('losses.pdf')
     plt.clf()
 
     # standardise x_obs
@@ -231,8 +232,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_stereological.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=12345)
+    parser.add_argument("--n_obs", type=int, default=500)
+    parser.add_argument("--n_sims", type=int, default=30_000)
     args = parser.parse_args()
 
     run_stereological(args)
