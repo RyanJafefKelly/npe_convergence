@@ -5,11 +5,13 @@ import os
 import pickle as pkl
 
 import arviz as az
+import numpy as np
 import jax.numpy as jnp
 import jax.random as random
 import matplotlib.pyplot as plt
 import numpyro  # type: ignore
 import numpyro.distributions as dist  # type: ignore
+from numpyro.diagnostics import hpdi  # type: ignore
 from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
@@ -73,7 +75,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000  # TODO: see what can get away with for MMD
+    num_posterior_samples = 10_000  # TODO! UPDATE BACK TO 10_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -196,76 +198,49 @@ def run_gnk(*args, **kwargs):
 
     num_coverage_samples = 100
     coverage_levels = [0.8, 0.9, 0.95]
-
-    # bias/coverage for true parameter
-    true_params_unbounded = logit(true_params / 10)
-    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
-    bias = jnp.mean(posterior_samples, axis=0) - true_params
-    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                          x_obs)
-    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(), descending=True)
-    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
-    true_in_credible_interval = [0, 0, 0]
-    for i, level in enumerate(coverage_levels):
-        coverage_index = int(level * num_posterior_samples)
-        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-        if pdf_theta > pdf_posterior_sample:
-            true_in_credible_interval[i] = 1
-
-    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
-        f.write(f"{true_in_credible_interval}\n")
-
-    with open(f"{dirname}true_bias.txt", "w") as f:
-        f.write(f"{bias}\n")
-
-    coverage_levels_counts = [0, 0, 0]
+    coverage_levels_counts = np.zeros((theta_dims, 3))  # rows - params, cols - coverage levels
     biases = jnp.array([])
 
     for i in range(num_coverage_samples):
-        key, sub_key = random.split(key)
-        theta_draw_original = dist.Uniform(0, 10).sample(sub_key, (1, 4))
-
-        theta_draw = logit(theta_draw_original / 10)
-        theta_draw = (theta_draw - thetas_mean) / thetas_std
-
+        # Fixed true param
+        # generate x_obs
         key, sub_key = random.split(key)
         z = random.normal(sub_key, shape=(n_obs,))
-        x_draw_original = gnk(z, *theta_draw_original.ravel())
-        x_draw = jnp.atleast_2d(x_draw_original)
-        x_draw = ss_octile(x_draw)
-        x_draw = jnp.squeeze(x_draw)
-
-        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
-
+        A, B, g, k = true_params
+        A = jnp.array([A])
+        B = jnp.array([B])
+        g = jnp.array([g])
+        k = jnp.array([k])
+        x_obs = get_summaries_batches(sub_key,
+                                      A, B, g, k,
+                                      n_obs=n_obs,
+                                      n_sims=1, batch_size=1)
+        x_obs = jnp.squeeze(x_obs)
+        x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
+        print('x_obs (2): ', x_obs)
+        # condition and draw from posterior
+        key, sub_key = random.split(sub_key)
         posterior_samples_original = flow.sample(sub_key,
                                                  sample_shape=(num_posterior_samples,),
-                                                 condition=x_draw)
+                                                 condition=x_obs)
         posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
         posterior_samples = jnp.squeeze(posterior_samples)
         posterior_samples = expit(posterior_samples) * 10
 
-        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
+        bias = jnp.mean(posterior_samples, axis=0) - true_params
         biases = jnp.concatenate((biases, bias.ravel()))
-        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                              x_draw)
-        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
-                                         descending=True)
-        pdf_theta = flow.log_prob(theta_draw, x_draw)
-
-        for i, level in enumerate(coverage_levels):
-            coverage_index = int(level * num_posterior_samples)
-            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-            if pdf_theta > pdf_posterior_sample:
-                coverage_levels_counts[i] += 1
+        for i in range(theta_dims):  # check if true param in credible interval, marginally
+            posterior_samples_i = posterior_samples[:, i].ravel()
+            for ii, coverage_level in enumerate(coverage_levels):
+                lower, upper = hpdi(posterior_samples_i, coverage_level)
+                if lower < true_params[i] < upper:
+                    coverage_levels_counts[i, ii] += 1
 
     print(coverage_levels_counts)
     estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
 
-    with open(f"{dirname}coverage.txt", "w") as f:
-        f.write(f"{estimated_coverage}\n")
-
-    with open(f"{dirname}biases.txt", "w") as f:
-        f.write(f"{biases}\n")
+    np.save(f"{dirname}estimated_coverage.npy", estimated_coverage)
+    np.save(f"{dirname}biases.npy", biases)
 
     return kl, mmd
 
@@ -275,10 +250,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="run_gnk.py",
         description="Run gnk model.",
-        epilog="Example usage: terpython run_gnk.py"
+        epilog="Example usage: python run_gnk.py"
     )
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=500)
-    parser.add_argument("--n_sims", type=int, default=11823)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=1234567)
     args = parser.parse_args()
     run_gnk(args)
