@@ -64,7 +64,7 @@ def get_prior_samples(key, num_samples: int):
 
 
 def stereological(key, poisson_rate, pareto_scale, pareto_shape, n_obs=100, num_samples=1):
-    v_0 = 5  # CONSTANT
+    v_0 = 5.0  # CONSTANT
     key, subkey = random.split(key)
     poisson_rate = jnp.atleast_1d(poisson_rate)
     pareto_shape = jnp.atleast_1d(pareto_shape)
@@ -115,7 +115,6 @@ def stereological(key, poisson_rate, pareto_scale, pareto_shape, n_obs=100, num_
 
 
 def get_summaries(x):
-    # TODO: few options
     # 4 SUMMARIES: number of inclusions, log(min(S)), log(mean(S)) and log(max(S))
     if x.shape[-1] == 1:
         x = x.T  # NOTE: lazy fix for 1-dim case

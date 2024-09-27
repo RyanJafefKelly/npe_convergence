@@ -2,6 +2,7 @@ import argparse
 import os
 import pickle as pkl
 
+import numpy as np
 import jax.numpy as jnp
 import jax.random as random
 import matplotlib.pyplot as plt
@@ -10,6 +11,9 @@ from flowjax.bijections import RationalQuadraticSpline  # type: ignore
 from flowjax.distributions import Normal  # type: ignore
 from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
+from scipy.stats import gaussian_kde as kde
+from numpyro.diagnostics import hpdi  # type: ignore
+
 
 from npe_convergence.examples.stereological import (get_prior_samples,
                                                     get_summaries,
@@ -152,73 +156,44 @@ def run_stereological(*args, **kwargs):
     with open(f"{dirname}true_bias.txt", "w") as f:
         f.write(f"{bias}\n")
 
-    coverage_levels_counts = [0, 0, 0]
+    coverage_levels_counts = np.zeros((3, 3))  # rows - params, cols - coverage levels
     biases = jnp.array([])
 
     for i in range(num_coverage_samples):
+        # Fixed true param
+        # generate x_obs
         key, sub_key = random.split(key)
-        theta_draw_original = get_prior_samples(sub_key, 1)
-
-        theta_draw = transform_to_unbounded(theta_draw_original)
-        theta_draw = (theta_draw - thetas_mean) / thetas_std
-
+        x_obs = stereological(sub_key, *true_params, num_samples=1, n_obs=n_obs)
+        print('x_obs (1): ', x_obs)
+        x_obs = get_summaries(x_obs)
+        x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
+        print('x_obs (2): ', x_obs)
+        # condition and draw from posterior
         key, sub_key = random.split(sub_key)
-        x_draw_original = stereological(sub_key, *theta_draw_original.T,
-                                        num_samples=1)
-        x_draw = get_summaries(x_draw_original)
-        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
-
         posterior_samples_original = flow.sample(sub_key,
                                                  sample_shape=(num_posterior_samples,),
-                                                 condition=x_draw)
+                                                 condition=x_obs)
         posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
         posterior_samples = jnp.squeeze(posterior_samples)
         posterior_samples = transform_to_bounded(posterior_samples)
-        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
-        biases = jnp.concatenate((biases, bias.ravel()))
-        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                              x_draw)
-        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
-                                         descending=True)
-        pdf_theta = flow.log_prob(theta_draw, x_draw)
 
-        for i, level in enumerate(coverage_levels):
-            coverage_index = int(level * num_posterior_samples)
-            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-            if pdf_theta > pdf_posterior_sample:
-                coverage_levels_counts[i] += 1
+        bias = jnp.mean(posterior_samples, axis=0) - true_params
+        biases = jnp.concatenate((biases, bias.ravel()))
+        for i in range(3):  # check if true param in credible interval, marginally
+            posterior_samples_i = posterior_samples[:, i].ravel()
+            for ii, coverage_level in enumerate(coverage_levels):
+                coverage_index = int(level * num_posterior_samples)
+                lower, upper = hpdi(posterior_samples_i, coverage_level)
+                # lower = jnp.quantile(posterior_samples_i, (1 - coverage_level) / 2)
+                # upper = jnp.quantile(posterior_samples_i, 1 - ((1 - coverage_level) / 2))
+                if lower < true_params[i] < upper:
+                    coverage_levels_counts[i, ii] += 1
 
     print(coverage_levels_counts)
     estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
 
-    with open(f"{dirname}coverage.txt", "w") as f:
-        f.write(f"{estimated_coverage}\n")
-
-    with open(f"{dirname}biases.txt", "w") as f:
-        f.write(f"{biases}\n")
-
-    # ppc_samples = stereological(sub_key, *posterior_samples.T, num_samples=num_posterior_samples)
-    # ppc_summaries = get_summaries(ppc_samples)
-    # ppc_summaries = jnp.squeeze(ppc_summaries)
-    # plt.hist(ppc_summaries[:, 0], bins=50)
-    # plt.axvline(x_obs_original[0], color='red')
-    # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simnum_inclusions_posterior_stereo_npe_sim.pdf')
-    # plt.clf()
-
-    # plt.hist(ppc_summaries[:, 1], bins=50)
-    # plt.axvline(x_obs_original[1], color='red')
-    # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmin_inclusions_posterior_stereo_npe_sim.pdf')
-    # plt.clf()
-
-    # plt.hist(ppc_summaries[:, 2], bins=50)
-    # plt.axvline(x_obs_original[2], color='red')
-    # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmean_inclusions_posterior_stereo_npe_sim.pdf')
-    # plt.clf()
-
-    # plt.hist(ppc_summaries[:, 3], bins=50)
-    # plt.axvline(x_obs_original[3], color='red')
-    # plt.savefig(f'{dirname}t1_posterior_stereo_npe_simmax_inclusions_posterior_stereo_npe_sim.pdf')
-    # plt.clf()
+    np.save(f"{dirname}estimated_coverage.npy", estimated_coverage)
+    np.save(f"{dirname}biases.npy", biases)
 
     return None, None
 
@@ -231,8 +206,8 @@ if __name__ == "__main__":
         epilog="Example usage: python run_stereological.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=12345)
+    parser.add_argument("--n_obs", type=int, default=1000)
+    parser.add_argument("--n_sims", type=int, default=123456)
     args = parser.parse_args()
 
     run_stereological(args)
