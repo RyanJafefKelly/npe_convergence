@@ -134,27 +134,27 @@ def run_stereological(*args, **kwargs):
     num_coverage_samples = 100
     coverage_levels = [0.8, 0.9, 0.95]
 
-    # bias/coverage for true parameter
-    true_params_unbounded = transform_to_unbounded(jnp.atleast_2d(true_params))
-    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
-    bias = jnp.mean(posterior_samples, axis=0) - true_params
-    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                          x_obs)
-    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
-                                     descending=True)
-    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
-    true_in_credible_interval = [0, 0, 0]
-    for i, level in enumerate(coverage_levels):
-        coverage_index = int(level * num_posterior_samples)
-        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-        if pdf_theta > pdf_posterior_sample:
-            true_in_credible_interval[i] = 1
+    # # bias/coverage for true parameter
+    # true_params_unbounded = transform_to_unbounded(jnp.atleast_2d(true_params))
+    # true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
+    # bias = jnp.mean(posterior_samples, axis=0) - true_params
+    # pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+    #                                       x_obs)
+    # pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+    #                                  descending=True)
+    # pdf_theta = flow.log_prob(true_params_standardised, x_obs)
+    # true_in_credible_interval = [0, 0, 0]
+    # for i, level in enumerate(coverage_levels):
+    #     coverage_index = int(level * num_posterior_samples)
+    #     pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+    #     if pdf_theta > pdf_posterior_sample:
+    #         true_in_credible_interval[i] = 1
 
-    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
-        f.write(f"{true_in_credible_interval}\n")
+    # with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
+    #     f.write(f"{true_in_credible_interval}\n")
 
-    with open(f"{dirname}true_bias.txt", "w") as f:
-        f.write(f"{bias}\n")
+    # with open(f"{dirname}true_bias.txt", "w") as f:
+    #     f.write(f"{bias}\n")
 
     coverage_levels_counts = np.zeros((3, 3))  # rows - params, cols - coverage levels
     biases = jnp.array([])
@@ -182,7 +182,7 @@ def run_stereological(*args, **kwargs):
         for i in range(3):  # check if true param in credible interval, marginally
             posterior_samples_i = posterior_samples[:, i].ravel()
             for ii, coverage_level in enumerate(coverage_levels):
-                coverage_index = int(level * num_posterior_samples)
+                # coverage_index = int(coverage_level * num_posterior_samples)
                 lower, upper = hpdi(posterior_samples_i, coverage_level)
                 # lower = jnp.quantile(posterior_samples_i, (1 - coverage_level) / 2)
                 # upper = jnp.quantile(posterior_samples_i, 1 - ((1 - coverage_level) / 2))

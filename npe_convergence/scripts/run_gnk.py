@@ -167,8 +167,7 @@ def run_gnk(*args, **kwargs):
     posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
     posterior_samples = expit(posterior_samples) * 10
-    # plt.xlim(0, 1)
-    # true_thetas = true_thetas.T  # TODO: ugly
+
     true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
     for ii, (k, v) in enumerate(true_thetas.items()):
         true_posterior_samples = true_posterior_samples.at[:, ii].set(v)
