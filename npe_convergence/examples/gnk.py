@@ -144,6 +144,25 @@ def gnk_model(obs, n_obs):
                        obs=obs[i])
 
 
+def gnk_model_narrow_prior(obs, n_obs):
+    """Model for the g-and-k distribution using Numpyro."""
+    A = numpyro.sample('A', dist.Uniform(0, 5))
+    B = numpyro.sample('B', dist.Uniform(0, 5))
+    g = numpyro.sample('g', dist.Uniform(0, 5))
+    k = numpyro.sample('k', dist.Uniform(0, 5))
+
+    octiles = jnp.linspace(12.5, 87.5, 7) / 100
+    norm_quantiles = norm.ppf(octiles)
+    expected_summaries = gnk(norm_quantiles, A, B, g, k)
+
+    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
+    for i in range(7):
+        numpyro.sample(f'y_{i}',
+                       dist.Normal(expected_summaries[i],
+                                   jnp.sqrt(y_variance[i])),
+                       obs=obs[i])
+
+
 def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     """Run the NUTS sampler."""
     rng_key = random.PRNGKey(seed)
@@ -161,6 +180,44 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     # NOTE: need to transform initial parameters to unbounded space
     def init_param_to_unbounded(value, num_chains, subkey):
         param_arr = jnp.repeat(logit(jnp.array([value])/10), num_chains)
+        noise = random.normal(subkey, (num_chains,)) * 0.05
+
+        return param_arr + noise
+
+    rng_key, *subkeys = random.split(rng_key, 5)
+
+    init_params = {
+        'A': init_param_to_unbounded(3.0, num_chains, subkeys[0]),
+        'B': init_param_to_unbounded(1.0, num_chains, subkeys[1]),
+        'g': init_param_to_unbounded(2.0, num_chains, subkeys[2]),
+        'k': init_param_to_unbounded(0.5, num_chains, subkeys[3])
+    }
+
+    mcmc.run(rng_key=rng_key,
+             init_params=init_params,
+             obs=obs,
+             n_obs=n_obs)
+
+    return mcmc
+
+
+def run_nuts_narrow_prior(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
+    """Run the NUTS sampler."""
+    rng_key = random.PRNGKey(seed)
+    kernel = NUTS(gnk_model_narrow_prior)
+    thinning = 10
+    num_chains = 4
+
+    mcmc = MCMC(kernel,
+                num_warmup=num_warmup,
+                num_samples=num_samples*thinning // num_chains,
+                thinning=thinning,
+                num_chains=num_chains,
+                )
+
+    # NOTE: need to transform initial parameters to unbounded space
+    def init_param_to_unbounded(value, num_chains, subkey):
+        param_arr = jnp.repeat(logit(jnp.array([value])/5), num_chains)
         noise = random.normal(subkey, (num_chains,)) * 0.05
 
         return param_arr + noise
