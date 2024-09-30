@@ -164,10 +164,8 @@ def run_stereological(*args, **kwargs):
         # generate x_obs
         key, sub_key = random.split(key)
         x_obs = stereological(sub_key, *true_params, num_samples=1, n_obs=n_obs)
-        print('x_obs (1): ', x_obs)
         x_obs = get_summaries(x_obs)
         x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
-        print('x_obs (2): ', x_obs)
         # condition and draw from posterior
         key, sub_key = random.split(sub_key)
         posterior_samples_original = flow.sample(sub_key,

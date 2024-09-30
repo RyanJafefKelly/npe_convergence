@@ -23,7 +23,7 @@ from npe_convergence.examples.stereological import (get_prior_samples,
                                                     transform_to_unbounded)
 
 
-def run_stereological(*args, **kwargs):
+def run_stereological_precondition(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
     except ValueError:
@@ -172,10 +172,8 @@ def run_stereological(*args, **kwargs):
         # generate x_obs
         key, sub_key = random.split(key)
         x_obs = stereological(sub_key, *true_params, num_samples=1, n_obs=n_obs)
-        print('x_obs (1): ', x_obs)
         x_obs = get_summaries(x_obs)
         x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
-        print('x_obs (2): ', x_obs)
         # condition and draw from posterior
         key, sub_key = random.split(sub_key)
         posterior_samples_original = flow.sample(sub_key,
@@ -209,13 +207,13 @@ def run_stereological(*args, **kwargs):
 if __name__ == "__main__":
     numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
-        prog="run_stereological.py",
+        prog="run_stereological_precondition.py",
         description="Run stereological model.",
-        epilog="Example usage: python run_stereological.py"
+        epilog="Example usage: python run_stereological_precondition.py"
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=1000)
     parser.add_argument("--n_sims", type=int, default=123456)
     args = parser.parse_args()
 
-    run_stereological(args)
+    run_stereological_precondition(args)

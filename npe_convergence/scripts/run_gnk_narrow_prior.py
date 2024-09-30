@@ -23,7 +23,7 @@ from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
 
-def run_gnk(*args, **kwargs):
+def run_gnk_narrow_prior(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
     except ValueError:
@@ -217,7 +217,6 @@ def run_gnk(*args, **kwargs):
                                       n_sims=1, batch_size=1)
         x_obs = jnp.squeeze(x_obs)
         x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
-        print('x_obs (2): ', x_obs)
         # condition and draw from posterior
         key, sub_key = random.split(sub_key)
         posterior_samples_original = flow.sample(sub_key,
@@ -248,12 +247,12 @@ def run_gnk(*args, **kwargs):
 if __name__ == "__main__":
     numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
-        prog="run_gnk.py",
-        description="Run gnk model.",
-        epilog="Example usage: python run_gnk.py"
+        prog="run_gnk_narrow_prior.py",
+        description="Run narrow prior gnk model.",
+        epilog="Example usage: python run_gnk_narrow_prior.py"
     )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=5_000)
     parser.add_argument("--n_sims", type=int, default=1234567)
     args = parser.parse_args()
-    run_gnk(args)
+    run_gnk_narrow_prior(args)
