@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #PBS -N mak_experiments 
-#PBS -l walltime=24:00:00
+#PBS -l walltime=120:00:00
 #PBS -l mem=64GB
 #PBS -l ncpus=1
 cd $PBS_O_WORKDIR
