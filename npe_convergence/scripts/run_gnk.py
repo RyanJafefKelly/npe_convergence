@@ -216,7 +216,6 @@ def run_gnk(*args, **kwargs):
                                       n_sims=1, batch_size=1)
         x_obs = jnp.squeeze(x_obs)
         x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
-        print('x_obs (2): ', x_obs)
         # condition and draw from posterior
         key, sub_key = random.split(sub_key)
         posterior_samples_original = flow.sample(sub_key,
