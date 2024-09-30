@@ -31,7 +31,7 @@ def run_gnk(*args, **kwargs):
         seed = args.seed
         n_obs = args.n_obs
         n_sims = args.n_sims
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    dirname = "res/gnk_precondition/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
@@ -75,7 +75,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000  # TODO! UPDATE BACK TO 10_000
+    num_posterior_samples = 10_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -115,6 +115,19 @@ def run_gnk(*args, **kwargs):
 
     key, sub_key = random.split(key)
     x_sims = get_summaries_batches(sub_key, A, B, g, k, n_obs, n_sims, batch_size=batch_size)
+    x_sims = x_sims.T
+    distances = np.linalg.norm(x_sims - x_obs, axis=1)
+    cutoff_index = int(len(distances) * 0.1)
+    # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
+    closest_indices = np.argpartition(distances, cutoff_index)[:cutoff_index]
+    closest_simulations = x_sims[closest_indices]
+    closest_thetas = thetas_unbounded[closest_indices]
+
+    
+    # TODO! PRECONDITIONING HERE ... LET'S JUST USE EUCLIDEAN FOR SIMPLICITY ... HAVE MMD AVAILABLE IF WANT THO
+    
+    
+    
     # x = gnk(z, A[None, :], B[None, :], g[None, :], k[None, :])
     # x = x.T  # TODO: shouldn't have to do this
 
@@ -122,14 +135,13 @@ def run_gnk(*args, **kwargs):
 
     # x_sims = jnp.array(x_sims)
 
-    thetas_mean = thetas_unbounded.mean(axis=0)
-    thetas_std = thetas_unbounded.std(axis=0)
-    thetas = (thetas_unbounded - thetas_mean) / thetas_std
+    thetas_mean = closest_thetas.mean(axis=0)
+    thetas_std = closest_thetas.std(axis=0)
+    thetas = (closest_thetas - thetas_mean) / thetas_std
 
-    sim_summ_data = x_sims.T   # TODO? ugly to do this
-    sim_summ_data_mean = sim_summ_data.mean(axis=0)
-    sim_summ_data_std = sim_summ_data.std(axis=0)
-    sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
+    sim_summ_data_mean = closest_simulations.mean(axis=0)
+    sim_summ_data_std = closest_simulations.std(axis=0)
+    sim_summ_data = (closest_simulations - sim_summ_data_mean) / sim_summ_data_std
     x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
 
     key, sub_key = random.split(key)
@@ -167,7 +179,8 @@ def run_gnk(*args, **kwargs):
     posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
     posterior_samples = expit(posterior_samples) * 10
-
+    # plt.xlim(0, 1)
+    # true_thetas = true_thetas.T  # TODO: ugly
     true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
     for ii, (k, v) in enumerate(true_thetas.items()):
         true_posterior_samples = true_posterior_samples.at[:, ii].set(v)
@@ -251,8 +264,8 @@ if __name__ == "__main__":
         description="Run gnk model.",
         epilog="Example usage: python run_gnk.py"
     )
-    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=5_000)
-    parser.add_argument("--n_sims", type=int, default=1234567)
+    parser.add_argument("--n_sims", type=int, default=1_111_111)
     args = parser.parse_args()
     run_gnk(args)

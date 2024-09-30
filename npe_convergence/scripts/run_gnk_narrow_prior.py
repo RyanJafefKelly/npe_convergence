@@ -18,7 +18,7 @@ from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
 
-from npe_convergence.examples.gnk import gnk, run_nuts, ss_octile, get_summaries_batches
+from npe_convergence.examples.gnk import gnk, run_nuts_narrow_prior, ss_octile, get_summaries_batches
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
@@ -31,7 +31,7 @@ def run_gnk(*args, **kwargs):
         seed = args.seed
         n_obs = args.n_obs
         n_sims = args.n_sims
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    dirname = "res/gnk_narrow_prior/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
@@ -75,10 +75,11 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000  # TODO! UPDATE BACK TO 10_000
+    num_posterior_samples = 10_000
     num_warmup = 10_000
-    mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
-                    num_samples=num_posterior_samples, num_warmup=num_warmup)
+    mcmc = run_nuts_narrow_prior(seed=1, obs=x_obs, n_obs=n_obs,
+                                 num_samples=num_posterior_samples,
+                                 num_warmup=num_warmup)
     mcmc.print_summary()
     inference_data = az.from_numpyro(mcmc)
     true_thetas = mcmc.get_samples()
@@ -103,8 +104,8 @@ def run_gnk(*args, **kwargs):
     # TODO: SAMPLE PRIOR
     key, subkey = random.split(key)
     tol = 1e-6  # NOTE: avoid infs when logit transform
-    thetas_bounded = dist.Uniform(0 + tol, 10 - tol).sample(subkey, (n_sims, 4))
-    thetas_unbounded = logit(thetas_bounded / 10)
+    thetas_bounded = dist.Uniform(0 + tol, 5 - tol).sample(subkey, (n_sims, 4))
+    thetas_unbounded = logit(thetas_bounded / 5)
 
     A, B, g, k = thetas_bounded.T
 
@@ -166,7 +167,7 @@ def run_gnk(*args, **kwargs):
 
     posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
-    posterior_samples = expit(posterior_samples) * 10
+    posterior_samples = expit(posterior_samples) * 5
 
     true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
     for ii, (k, v) in enumerate(true_thetas.items()):
@@ -224,7 +225,7 @@ def run_gnk(*args, **kwargs):
                                                  condition=x_obs)
         posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
         posterior_samples = jnp.squeeze(posterior_samples)
-        posterior_samples = expit(posterior_samples) * 10
+        posterior_samples = expit(posterior_samples) * 5
 
         bias = jnp.mean(posterior_samples, axis=0) - true_params
         biases = jnp.concatenate((biases, bias.ravel()))

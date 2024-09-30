@@ -32,7 +32,7 @@ def run_stereological(*args, **kwargs):
         n_obs = args.n_obs
         n_sims = args.n_sims
 
-    dirname = "res/stereological/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
+    dirname = "res/stereological_precondition/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) +  "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
@@ -54,18 +54,26 @@ def run_stereological(*args, **kwargs):
     # sim_data = stereological(subkey, *thetas.T, num_samples=n_sims, n_obs=n_obs)
     # sim_summ_data = get_summaries(sim_data)
     batch_size = min(50, n_sims)
-    sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims, batch_size)
+    sim_summ_data = get_summaries_batches(key, thetas, n_obs, n_sims,
+                                          batch_size)
 
     thetas = transform_to_unbounded(thetas)
 
-    thetas_mean = thetas.mean(axis=0)
-    thetas_std = thetas.std(axis=0)
-    thetas = (thetas - thetas_mean) / thetas_std
+    distances = np.linalg.norm(sim_summ_data - x_obs, axis=1)
+    cutoff_index = int(len(distances) * 0.1)
+    # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
+    closest_indices = np.argpartition(distances, cutoff_index)[:cutoff_index]
+    closest_simulations = sim_summ_data[closest_indices]
+    closest_thetas = thetas[closest_indices]
 
-    sim_summ_data_mean = jnp.nanmean(sim_summ_data, axis=0)  # TODO: hacky fix
-    sim_summ_data_std = jnp.nanstd(sim_summ_data, axis=0)
+    thetas_mean = closest_thetas.mean(axis=0)
+    thetas_std = closest_thetas.std(axis=0)
+    thetas = (closest_thetas - thetas_mean) / thetas_std
 
-    sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
+    sim_summ_data_mean = jnp.nanmean(closest_simulations, axis=0)  # TODO: hacky fix
+    sim_summ_data_std = jnp.nanstd(closest_simulations, axis=0)
+
+    sim_summ_data = (closest_simulations - sim_summ_data_mean) / sim_summ_data_std
 
     key, sub_key = random.split(key)
     theta_dims = 3
