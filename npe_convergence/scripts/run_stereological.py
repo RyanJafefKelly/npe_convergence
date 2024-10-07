@@ -203,7 +203,7 @@ if __name__ == "__main__":
         description="Run stereological model.",
         epilog="Example usage: python run_stereological.py"
     )
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=1000)
     parser.add_argument("--n_sims", type=int, default=123456)
     args = parser.parse_args()

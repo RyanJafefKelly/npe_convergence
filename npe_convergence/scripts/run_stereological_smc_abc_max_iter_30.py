@@ -10,10 +10,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as ss  # type: ignore
 
-from npe_convergence.examples.stereological import (get_prior_samples,
+from npe_convergence.examples.stereological import (
+                                                    # get_summaries,
+                                                    # get_summaries_batches,
                                                     stereological,
-                                                    transform_to_bounded,
-                                                    transform_to_unbounded)
+                                                    )
 
 
 def stereological_sim(poisson_rate, pareto_scale, pareto_shape, n_obs=100, batch_size=1, random_state=None):
@@ -122,6 +123,7 @@ def run_stereological_smc_abc(*args, **kwargs):
     key, subkey = random.split(key)
     y_obs_full = stereological(subkey, *true_params, n_obs=n_obs)
     y_obs = get_summaries(y_obs_full)
+    print("y_obs: ", y_obs)
     # plt.hist(x_obs.ravel())
     # plt.savefig("x_obs.pdf")
     y_obs_original = y_obs.copy()
@@ -131,7 +133,7 @@ def run_stereological_smc_abc(*args, **kwargs):
 
     np.random.seed(seed)
 
-    max_iter = 40
+    max_iter = 30
     num_posterior_samples = 10_000
     adaptive_smc = elfi.AdaptiveThresholdSMC(m['d'],
                                              batch_size=1_000,
@@ -160,8 +162,8 @@ if __name__ == "__main__":
         description="Run stereological model with SMC ABC.",
         epilog="Example usage: python run_stereological_smc_abc.py"
     )
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--n_obs", type=int, default=1000)
     parser.add_argument("--n_sims", type=int, default=None)
     args = parser.parse_args()
     run_stereological_smc_abc(args)
