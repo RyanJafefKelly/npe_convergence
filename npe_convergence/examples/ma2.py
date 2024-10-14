@@ -192,3 +192,24 @@ def numpyro_model(obs, a=2, n_obs=100):
     stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
 
     numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
+
+
+def numpyro_model_b0(obs, n_obs=100):
+    ma_order = 2
+    t1 = numpyro.sample('t1', dist.Uniform(-1, 1))
+    t2 = numpyro.sample('t2', dist.Uniform(-1, 1))
+    thetas = jnp.array([t1, t2])
+    y_variance = numpyro.deterministic(
+        "y_variance",
+        jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
+                   for k in range(0, ma_order+1)])
+    )
+
+    mean = numpyro.deterministic(
+        "mean",
+        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
+    )
+
+    stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+
+    numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
