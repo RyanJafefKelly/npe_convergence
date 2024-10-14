@@ -23,7 +23,7 @@ from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
 
-def run_gnk(*args, **kwargs):
+def run_gnk_duodeciles(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
     except ValueError:
@@ -31,7 +31,7 @@ def run_gnk(*args, **kwargs):
         seed = args.seed
         n_obs = args.n_obs
         n_sims = args.n_sims
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    dirname = "res/gnk_duodeciles/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
@@ -75,7 +75,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 4_000  # TODO! UPDATE BACK TO 10_000
+    num_posterior_samples = 10_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -249,12 +249,12 @@ def run_gnk(*args, **kwargs):
 if __name__ == "__main__":
     numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
-        prog="run_gnk.py",
+        prog="run_gnk_duodeciles.py",
         description="Run gnk model.",
-        epilog="Example usage: python run_gnk.py"
+        epilog="Example usage: python run_gnk_duodeciles.py"
     )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=1_000)
     parser.add_argument("--n_sims", type=int, default=10_000)
     args = parser.parse_args()
-    run_gnk(args)
+    run_gnk_duodeciles(args)
