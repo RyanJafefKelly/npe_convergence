@@ -23,13 +23,21 @@ def ss_octile(y):
     return jnp.percentile(y, octiles, axis=-1)
 
 
+def ss_duodecile(y):
+    """Calculate octiles of the input data."""
+    duodeciles = jnp.linspace(8.33, 91.67, 11)
+    return jnp.percentile(y, duodeciles, axis=-1)
+
+
 def gnk_density(x, A, B, g, k, c=0.8):
     """Calculate the density of the g-and-k distribution."""
     z = pgk(x, A, B, g, k, c, zscale=True)
     return norm.pdf(z) / gnk_deriv(z, A, B, g, k, c)
 
 
-def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size):
+def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size, sum_fn=None):
+    if sum_fn is None:
+        sum_fn = ss_octile
     num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
     all_octiles = []
 
@@ -47,7 +55,7 @@ def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size):
         x_batch = gnk(z_batch, A_batch, B_batch, g_batch, k_batch)
         x_batch = x_batch.T
 
-        octiles_batch = ss_octile(x_batch)
+        octiles_batch = sum_fn(x_batch)
         all_octiles.append(octiles_batch)
 
     return jnp.concatenate(all_octiles, axis=1)
@@ -132,12 +140,14 @@ def gnk_model(obs, n_obs):
     g = numpyro.sample('g', dist.Uniform(0, 10))
     k = numpyro.sample('k', dist.Uniform(0, 10))
 
-    octiles = jnp.linspace(12.5, 87.5, 7) / 100
-    norm_quantiles = norm.ppf(octiles)
+    # octiles = jnp.linspace(12.5, 87.5, 7) / 100
+    quantile_length = 100*(1/len(obs))
+    quantiles = jnp.linspace(quantile_length, 100-quantile_length, len(obs)) / 100
+    norm_quantiles = norm.ppf(quantiles)
     expected_summaries = gnk(norm_quantiles, A, B, g, k)
 
-    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
-    for i in range(7):
+    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in quantiles]
+    for i in range(len(obs)):
         numpyro.sample(f'y_{i}',
                        dist.Normal(expected_summaries[i],
                                    jnp.sqrt(y_variance[i])),
@@ -156,7 +166,7 @@ def gnk_model_narrow_prior(obs, n_obs):
     expected_summaries = gnk(norm_quantiles, A, B, g, k)
 
     y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
-    for i in range(7):
+    for i in range(len(obs)):
         numpyro.sample(f'y_{i}',
                        dist.Normal(expected_summaries[i],
                                    jnp.sqrt(y_variance[i])),
