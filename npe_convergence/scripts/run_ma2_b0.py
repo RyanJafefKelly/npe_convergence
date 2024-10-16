@@ -38,7 +38,7 @@ def run_ma2_b0(*args, **kwargs):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     true_params = jnp.array([0.6, 0.2])
-    key = random.PRNGKey(seed)    # x_obs_original = x_obs.copy()
+    key = random.PRNGKey(seed)
 
     key, sub_key = random.split(key)
     x_obs = get_summaries_batches(sub_key,
@@ -48,10 +48,10 @@ def run_ma2_b0(*args, **kwargs):
                                   n_sims,
                                   1)
     x_obs_original = x_obs.copy()
+
+    num_posterior_samples = 10_000
+
     key, sub_key = random.split(key)
-
-    num_posterior_samples = 2_000  # TODO!
-
     t1 = random.uniform(sub_key, shape=(n_sims,))
     t1_bounded = 2 * t1 - 1
     t1 = logit(t1)
@@ -61,30 +61,17 @@ def run_ma2_b0(*args, **kwargs):
     t2_bounded = 2 * t2 - 1
     t2 = logit(t2)
 
-    # key, sub_key = random.split(key)
-    # t1_bounded = CustomPrior_t1.rvs(2., size=(n_sims,), key=sub_key)
-    # t1 = logit((t1_bounded + 1) / 4)
-
-    # key, sub_key = random.split(key)
-    # t2_bounded = CustomPrior_t2.rvs(t1_bounded, 1., size=(n_sims,), key=sub_key)
-    # t2 = logit((t2_bounded + 1) / 2)
-
     key, sub_key = random.split(key)
-    # sim_data = MA2(t1_bounded, t2_bounded, n_obs=n_obs, batch_size=n_sims, key=sub_key)
-    # sim_summ_data = sim_data
-    # sim_summ_data = jnp.array((jnp.var(sim_data, axis=1), autocov(sim_data, lag=1), autocov(sim_data, lag=2)))
 
     batch_size = min(1000, n_sims)
-    sim_summ_data = get_summaries_batches(key, t1_bounded, t2_bounded, n_obs, n_sims, batch_size)
+    sim_summ_data = get_summaries_batches(key, t1_bounded, t2_bounded, n_obs,
+                                          n_sims, batch_size)
 
     thetas = jnp.column_stack([t1, t2])
-    # thetas = jnp.vstack([thetas, true_params])  # TODO: FOR TESTING
     thetas_mean = thetas.mean(axis=0)
     thetas_std = thetas.std(axis=0)
     thetas = (thetas - thetas_mean) / thetas_std
 
-    # sim_summ_data = sim_summ_data.T
-    # sim_summ_data = jnp.vstack([sim_summ_data, x_obs])  # TODO: FOR TESTING
     sim_summ_data_mean = sim_summ_data.mean(axis=0)
     sim_summ_data_std = sim_summ_data.std(axis=0)
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
@@ -122,10 +109,6 @@ def run_ma2_b0(*args, **kwargs):
     plt.savefig(f'{dirname}losses.pdf')
     plt.clf()
 
-    # NOTE: b0, 1
-    # b_0_1s = [0, 0.1, 0.5, 1.0][::-1]
-    # for b_0_1 in b_0_1s:
-    #     b_0 = jnp.array([2.0, b_0_1, 0.0])
     nuts_kernel = NUTS(numpyro_model_b0)
     thinning = 10
     mcmc = MCMC(nuts_kernel,
@@ -145,46 +128,6 @@ def run_ma2_b0(*args, **kwargs):
     plt.savefig(f'{dirname}t2_posterior_exact.pdf')
     plt.clf()
 
-    #     # TODO: flow samples
-    #     b_0_standardised = (b_0 - sim_summ_data_mean) / sim_summ_data_std
-    #     key, sub_key = random.split(key)
-    #     posterior_samples_original = flow.sample(sub_key,
-    #                                              sample_shape=(num_posterior_samples,),
-    #                                              condition=b_0_standardised)
-    #     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
-    #     posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
-    #     posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
-    #     plt.hist(posterior_samples[:, 0], bins=50)
-    #     plt.savefig(f'{dirname}t1_posterior_flow_b_0_1_{b_0_1}.pdf')
-    #     plt.clf()
-
-    #     plt.hist(posterior_samples[:, 1], bins=50)
-    #     plt.savefig(f'{dirname}t2_posterior_flow_b_0_1_{b_0_1}.pdf')
-    #     plt.clf()
-
-    #     kl = kullback_leibler(true_posterior_samples, posterior_samples)
-    #     print(f"KL divergence for b_0_1 = {b_0_1}: {kl}")
-
-    # TODO: experiment on compatibility
-    # bs = [1.0, 1.5, 1.9, 1.99, 3, 4, 5]
-    # for i in range(100):
-    #     # test_theta = jnp.array([1.99, 0.999])
-    #     y_obs_synth = jnp.array([
-    #         autocov_exact(true_params, 0, 2),
-    #         autocov_exact(true_params, 1, 2) + i * jnp.sqrt(sample_autocov_variance(true_params, 1, n_obs, 2)),
-    #         autocov_exact(true_params, 2, 2)
-    #         ])
-    #     y_obs_synth = (y_obs_synth - sim_summ_data_mean) / sim_summ_data_std
-
-    #     # TODO: QUICK ABC CHECK
-    #     distances = jnp.linalg.norm(sim_summ_data - y_obs_synth, axis=1)
-    #     cutoff_index = int(len(distances) * 0.01)
-    #     # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
-    #     closest_indices = jnp.argpartition(distances, cutoff_index)[:cutoff_index]
-    #     # closest_simulations = sim_summ_data[closest_indices]
-    #     closest_t1 = t1_bounded[closest_indices]
-
-    #     # y_obs_synth = y_obs_synth.at[1].set()
     key, sub_key = random.split(key)
     posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
@@ -192,9 +135,7 @@ def run_ma2_b0(*args, **kwargs):
     posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
     posterior_samples = jnp.squeeze(posterior_samples)
     _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
-    # plt.xlim(0, 1)
-    # plt.hist(true_posterior_samples[:, 0], bins=bins)
-    # print('')
+
     plt.savefig(f'{dirname}t1_posterior.pdf')
     plt.clf()
 
@@ -251,16 +192,6 @@ def run_ma2_b0(*args, **kwargs):
     biases = jnp.array([])
 
     for i in range(num_coverage_samples):
-        # key, sub_key = random.split(key)
-        # t1_bounded = 2*random.uniform(sub_key, shape=(1,)) - 1
-        # t1 = logit((t1_bounded + 1) / 2)
-
-        # key, sub_key = random.split(key)
-        # t2_bounded = 2*random.uniform(sub_key, shape=(1,)) - 1
-        # t2 = logit((t2_bounded + 1) / 2)
-        # theta_draw_original = jnp.column_stack([t1_bounded, t2_bounded])
-        # theta_draw = jnp.column_stack([t1, t2])
-
         theta_draw = (true_params - thetas_mean) / thetas_std
 
         key, sub_key = random.split(sub_key)
@@ -290,10 +221,7 @@ def run_ma2_b0(*args, **kwargs):
         for i in range(2):  # check if true param in credible interval, marginally
             posterior_samples_i = posterior_samples[:, i].ravel()
             for ii, coverage_level in enumerate(coverage_levels):
-                # coverage_index = int(coverage_level * num_posterior_samples)
                 lower, upper = hpdi(posterior_samples_i, coverage_level)
-                # lower = jnp.quantile(posterior_samples_i, (1 - coverage_level) / 2)
-                # upper = jnp.quantile(posterior_samples_i, 1 - ((1 - coverage_level) / 2))
                 if lower < true_params[i] < upper:
                     coverage_levels_counts[i, ii] += 1
 
@@ -411,7 +339,6 @@ def run_ma2_b0(*args, **kwargs):
     #  NOTE: b0,0 lower
     b_0_0s = [0.01, 0.1, 0.25, 0.5, 0.75, 0.99]
 
-    # TODO! REPEATED RUNS
     for b_0_0 in b_0_0s:
         b_0 = jnp.array([b_0_0, 0.0, 0.0])
         tempered_smc = blackjax.adaptive_tempered_smc(
@@ -432,25 +359,6 @@ def run_ma2_b0(*args, **kwargs):
         true_posterior_samples = smc_state.particles
         true_posterior_samples = 2 * expit(true_posterior_samples) - 1
 
-        # t1_samples = samples[:, 0]
-        # t2_samples = samples[:, 1]
-
-        #  TODO: exact sampling
-        # nuts_kernel = NUTS(numpyro_model_b0)
-        # thinning = 10
-        # num_chains = 16
-        # mcmc = MCMC(nuts_kernel,
-        #             num_warmup=20_000,
-        #             num_samples=num_posterior_samples*thinning // num_chains,
-        #             thinning=thinning,
-        #             num_chains=num_chains
-        #             )
-        # mcmc.run(random.PRNGKey(1), obs=b_0,
-        #         #  init_params={'t1': 0., 't2': 0.},
-        #          n_obs=n_obs)
-        # mcmc.print_summary()
-        # samples = mcmc.get_samples()
-        # true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
         plt.hist(true_posterior_samples[:, 0], bins=50)
         plt.savefig(f'{dirname}t1_posterior_exact_b_0_0_{b_0_0}.pdf')
         plt.clf()
@@ -459,7 +367,6 @@ def run_ma2_b0(*args, **kwargs):
         plt.savefig(f'{dirname}t2_posterior_exact_b_0_0_{b_0_0}.pdf')
         plt.clf()
 
-        # TODO: flow samples
         b_0_standardised = (b_0 - sim_summ_data_mean) / sim_summ_data_std
         key, sub_key = random.split(key)
         posterior_samples_original = flow.sample(sub_key,
@@ -481,7 +388,6 @@ def run_ma2_b0(*args, **kwargs):
         with open(f'{dirname}kl_{b_0_0}.txt', 'w') as f:
             f.write(str(kl))
 
-        # TODO! COMMENT BACK IN
         t1s = jnp.linspace(-1.0, 1.0, num=100)
         t2s = jnp.linspace(-1.0, 1.0, num=100)
         log_pdfs = jnp.zeros((100, 100))
