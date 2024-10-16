@@ -6,6 +6,7 @@
 *.mat
 .vscode/
 res/
+old_res_pile/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
