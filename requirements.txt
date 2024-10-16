@@ -6,6 +6,7 @@ equinox>=0.9.0
 matplotlib>=3.3.4
 arviz>=0.11.2
 elfi>=0.8.0
+blackjax>=1.0.0
 # latex>=0.7.0
 # diffrax>=0.0.1
 # psutil>=5.8.0
