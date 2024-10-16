@@ -11,16 +11,22 @@ from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
 from numpyro.infer import MCMC, NUTS  # type: ignore
+from numpyro.diagnostics import hpdi  # type: ignore
+import numpy as np
 
-from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
-                                          autocov_exact, sample_autocov_variance,
-                                          autocov, numpyro_model_b0,
+from npe_convergence.examples.ma2 import (autocov_exact,
+                                          sample_autocov_variance,
+                                          numpyro_model_b0,
                                           get_summaries_batches)
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
+import numpyro.distributions as dist  # type: ignore
+import blackjax  # type: ignore
+import blackjax.smc.resampling as resampling  # type: ignore
+import jax
 
 
-def run_ma2_identifiable(*args, **kwargs):
+def run_ma2_b0(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
     except ValueError:
@@ -31,17 +37,26 @@ def run_ma2_identifiable(*args, **kwargs):
     dirname = "res/ma2_b0/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-
+    true_params = jnp.array([0.6, 0.2])
     key = random.PRNGKey(seed)    # x_obs_original = x_obs.copy()
 
     key, sub_key = random.split(key)
+    x_obs = get_summaries_batches(sub_key,
+                                  jnp.atleast_1d(true_params[0]),
+                                  jnp.atleast_1d(true_params[1]),
+                                  n_obs,
+                                  n_sims,
+                                  1)
+    x_obs_original = x_obs.copy()
+    key, sub_key = random.split(key)
 
-    num_posterior_samples = 4_000  # TODO!
+    num_posterior_samples = 2_000  # TODO!
 
     t1 = random.uniform(sub_key, shape=(n_sims,))
     t1_bounded = 2 * t1 - 1
     t1 = logit(t1)
 
+    key, sub_key = random.split(key)
     t2 = random.uniform(sub_key, shape=(n_sims,))
     t2_bounded = 2 * t2 - 1
     t2 = logit(t2)
@@ -74,7 +89,7 @@ def run_ma2_identifiable(*args, **kwargs):
     sim_summ_data_std = sim_summ_data.std(axis=0)
     sim_summ_data = (sim_summ_data - sim_summ_data_mean) / sim_summ_data_std
 
-    # x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
+    x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
 
     key, sub_key = random.split(sub_key)
     theta_dims = 2
@@ -107,27 +122,335 @@ def run_ma2_identifiable(*args, **kwargs):
     plt.savefig(f'{dirname}losses.pdf')
     plt.clf()
 
-    # NOTE: b0,0 lower
-    b_0_0s = [0.01, 0.1, 0.5, 0.99][::-1]
+    # NOTE: b0, 1
+    # b_0_1s = [0, 0.1, 0.5, 1.0][::-1]
+    # for b_0_1 in b_0_1s:
+    #     b_0 = jnp.array([2.0, b_0_1, 0.0])
+    nuts_kernel = NUTS(numpyro_model_b0)
+    thinning = 10
+    mcmc = MCMC(nuts_kernel,
+                num_warmup=2_000,
+                num_samples=num_posterior_samples * thinning,
+                thinning=thinning)
+    mcmc.run(random.PRNGKey(1), obs=x_obs_original,
+             init_params={'t1': 0., 't2': 0.}, n_obs=n_obs)
+    mcmc.print_summary()
+    samples = mcmc.get_samples()
+    true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
+    plt.hist(true_posterior_samples[:, 0], bins=50)
+    plt.savefig(f'{dirname}t1_posterior_exact.pdf')
+    plt.clf()
+
+    plt.hist(true_posterior_samples[:, 1], bins=50)
+    plt.savefig(f'{dirname}t2_posterior_exact.pdf')
+    plt.clf()
+
+    #     # TODO: flow samples
+    #     b_0_standardised = (b_0 - sim_summ_data_mean) / sim_summ_data_std
+    #     key, sub_key = random.split(key)
+    #     posterior_samples_original = flow.sample(sub_key,
+    #                                              sample_shape=(num_posterior_samples,),
+    #                                              condition=b_0_standardised)
+    #     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+    #     posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
+    #     posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+    #     plt.hist(posterior_samples[:, 0], bins=50)
+    #     plt.savefig(f'{dirname}t1_posterior_flow_b_0_1_{b_0_1}.pdf')
+    #     plt.clf()
+
+    #     plt.hist(posterior_samples[:, 1], bins=50)
+    #     plt.savefig(f'{dirname}t2_posterior_flow_b_0_1_{b_0_1}.pdf')
+    #     plt.clf()
+
+    #     kl = kullback_leibler(true_posterior_samples, posterior_samples)
+    #     print(f"KL divergence for b_0_1 = {b_0_1}: {kl}")
+
+    # TODO: experiment on compatibility
+    # bs = [1.0, 1.5, 1.9, 1.99, 3, 4, 5]
+    # for i in range(100):
+    #     # test_theta = jnp.array([1.99, 0.999])
+    #     y_obs_synth = jnp.array([
+    #         autocov_exact(true_params, 0, 2),
+    #         autocov_exact(true_params, 1, 2) + i * jnp.sqrt(sample_autocov_variance(true_params, 1, n_obs, 2)),
+    #         autocov_exact(true_params, 2, 2)
+    #         ])
+    #     y_obs_synth = (y_obs_synth - sim_summ_data_mean) / sim_summ_data_std
+
+    #     # TODO: QUICK ABC CHECK
+    #     distances = jnp.linalg.norm(sim_summ_data - y_obs_synth, axis=1)
+    #     cutoff_index = int(len(distances) * 0.01)
+    #     # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
+    #     closest_indices = jnp.argpartition(distances, cutoff_index)[:cutoff_index]
+    #     # closest_simulations = sim_summ_data[closest_indices]
+    #     closest_t1 = t1_bounded[closest_indices]
+
+    #     # y_obs_synth = y_obs_synth.at[1].set()
+    key, sub_key = random.split(key)
+    posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
+    posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+    posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
+    posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+    posterior_samples = jnp.squeeze(posterior_samples)
+    _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
+    # plt.xlim(0, 1)
+    # plt.hist(true_posterior_samples[:, 0], bins=bins)
+    # print('')
+    plt.savefig(f'{dirname}t1_posterior.pdf')
+    plt.clf()
+
+    plt.hist(posterior_samples[:, 1], bins=50)
+    plt.savefig(f'{dirname}t2_posterior.pdf')
+    plt.clf()
+
+    kl = kullback_leibler(true_posterior_samples,
+                          posterior_samples)
+
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
+                                               posterior_samples]))
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
+
+    with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
+        pkl.dump(posterior_samples, f)
+
+    with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
+        pkl.dump(true_posterior_samples, f)
+
+    with open(f'{dirname}kl.txt', 'w') as f:
+        f.write(str(kl))
+
+    with open(f'{dirname}mmd.txt', 'w') as f:
+        f.write(str(mmd))
+
+    num_coverage_samples = 100
+    coverage_levels = [0.8, 0.9, 0.95]
+
+    # bias/coverage for true parameter
+    true_params_unbounded = jnp.array([logit((true_params[0] + 1) / 2),
+                                       logit((true_params[1] + 1) / 2)])
+    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
+    bias = jnp.mean(posterior_samples, axis=0) - true_params
+    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                          x_obs)
+    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                     descending=True)
+    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
+    true_in_credible_interval = [0, 0, 0]
+    for i, level in enumerate(coverage_levels):
+        coverage_index = int(level * num_posterior_samples)
+        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
+        if pdf_theta > pdf_posterior_sample:
+            true_in_credible_interval[i] = 1
+
+    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
+        f.write(f"{true_in_credible_interval}\n")
+
+    with open(f"{dirname}true_bias.txt", "w") as f:
+        f.write(f"{bias}\n")
+
+    coverage_levels_counts = np.zeros((2, 3))  # rows - params, cols - coverage levels
+    biases = jnp.array([])
+
+    for i in range(num_coverage_samples):
+        # key, sub_key = random.split(key)
+        # t1_bounded = 2*random.uniform(sub_key, shape=(1,)) - 1
+        # t1 = logit((t1_bounded + 1) / 2)
+
+        # key, sub_key = random.split(key)
+        # t2_bounded = 2*random.uniform(sub_key, shape=(1,)) - 1
+        # t2 = logit((t2_bounded + 1) / 2)
+        # theta_draw_original = jnp.column_stack([t1_bounded, t2_bounded])
+        # theta_draw = jnp.column_stack([t1, t2])
+
+        theta_draw = (true_params - thetas_mean) / thetas_std
+
+        key, sub_key = random.split(sub_key)
+        x_draw = get_summaries_batches(sub_key,
+                                       jnp.atleast_1d(true_params[0]),
+                                       jnp.atleast_1d(true_params[1]),
+                                       n_obs=n_obs,
+                                       n_sims=1,
+                                       batch_size=1)
+        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
+
+        posterior_samples_original = flow.sample(sub_key,
+                                                 sample_shape=(num_posterior_samples,),
+                                                 condition=x_draw)
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+        posterior_samples = jnp.squeeze(posterior_samples)
+        posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
+        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+        bias = jnp.mean(posterior_samples, axis=0) - true_params
+        biases = jnp.concatenate((biases, bias.ravel()))
+        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
+                                              x_draw)
+        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
+                                         descending=True)
+        pdf_theta = flow.log_prob(theta_draw, x_draw)
+
+        for i in range(2):  # check if true param in credible interval, marginally
+            posterior_samples_i = posterior_samples[:, i].ravel()
+            for ii, coverage_level in enumerate(coverage_levels):
+                # coverage_index = int(coverage_level * num_posterior_samples)
+                lower, upper = hpdi(posterior_samples_i, coverage_level)
+                # lower = jnp.quantile(posterior_samples_i, (1 - coverage_level) / 2)
+                # upper = jnp.quantile(posterior_samples_i, 1 - ((1 - coverage_level) / 2))
+                if lower < true_params[i] < upper:
+                    coverage_levels_counts[i, ii] += 1
+
+    print(coverage_levels_counts)
+    estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
+
+    np.save(f"{dirname}estimated_coverage.npy", estimated_coverage)
+    np.save(f"{dirname}biases.npy", biases)
+
+    def log_det_jacobian(u):
+        # Compute the log absolute determinant of the Jacobian
+        s = expit(u)
+        dt_du = 2.0 * s * (1.0 - s)
+        return jnp.sum(jnp.log(jnp.abs(dt_du)), axis=-1)
+
+    def compute_log_prior_single(theta):
+        t1, t2 = theta
+        t1 = 2 * expit(t1) - 1
+        t2 = 2 * expit(t2) - 1
+        logp_t1 = dist.Uniform(-1, 1, validate_args=True).log_prob(t1)
+        logp_t2 = dist.Uniform(-1, 1, validate_args=True).log_prob(t2)
+        # log_det_jacobian_val = log_det_jacobian(theta)
+        return logp_t1 + logp_t2  # + log_det_jacobian_val
+
+    def log_prior_fn(params):
+        if params.ndim == 1:
+            # Unbatched input
+            return compute_log_prior_single(params)
+        else:
+            # Batched input
+            compute_log_prior_batch = jax.vmap(compute_log_prior_single)
+            return compute_log_prior_batch(params)
+
+    def compute_log_likelihood_single(theta, obs, n_obs=100):
+        ma_order = 2
+        thetas = 2 * expit(theta) - 1
+
+        # Compute y_variance
+        y_variance = jnp.array([
+            sample_autocov_variance(thetas, k, n_obs, ma_order)
+            for k in range(ma_order + 1)
+        ])
+
+        # Compute mean
+        mean = jnp.array([
+            autocov_exact(thetas, i, ma_order)
+            for i in range(ma_order + 1)
+        ])
+
+        stdev = jnp.sqrt(y_variance)
+        log_probs = dist.Normal(mean, stdev).log_prob(obs)
+        log_lik = jnp.sum(log_probs)
+
+        return log_lik
+
+    def log_likelihood_fn(params, obs, n_obs=100):
+        # Check if params is batched or unbatched
+        if params.ndim == 1:
+            # Unbatched input
+            return compute_log_likelihood_single(params, obs, n_obs)
+        else:
+            # Batched input
+            compute_log_likelihood_batch = jax.vmap(compute_log_likelihood_single, in_axes=(0, None, None))
+            return compute_log_likelihood_batch(params, obs, n_obs)
+
+    # step_sizes = jnp.linspace(1e-3, 1e-2, num_posterior_samples)  # Varying step sizes
+    hmc_parameters = {
+        'step_size': jnp.full(num_posterior_samples, 5e-3),
+        'inverse_mass_matrix': 0.1*jnp.ones((num_posterior_samples, 2)),
+        'num_integration_steps': jnp.full(num_posterior_samples, 100),
+    }
+
+    if thetas.shape[0] < num_posterior_samples:
+        repeated_thetas = jnp.resize(thetas, (num_posterior_samples, thetas.shape[1]))
+        initial_particles = repeated_thetas[:num_posterior_samples, :]
+    else:
+        initial_particles = thetas[:num_posterior_samples, :]
+
+    def smc_inference_loop(rng_key, smc_kernel, initial_state):
+        """Run the temepered SMC algorithm.
+
+        We run the adaptive algorithm until the tempering parameter lambda reaches the value
+        lambda=1.
+
+        """
+
+        def cond(carry):
+            i, state, _k = carry
+            return state.lmbda < 1
+
+        def one_step(carry):
+            i, state, k = carry
+            k, subk = random.split(k, 2)
+            state, _ = smc_kernel(subk, state)
+            return i + 1, state, k
+
+        n_iter, final_state, _ = jax.lax.while_loop(
+            cond, one_step, (0, initial_state, rng_key)
+        )
+
+        return n_iter, final_state
+
+    # def update_inverse_mass_matrix(particles):
+    #     # particles: (num_particles, parameter_dim)
+    #     # Compute the covariance matrix of the particles
+    #     particles_mean = jnp.mean(particles, axis=0)
+    #     centered_particles = particles - particles_mean
+    #     covariance_matrix = jnp.dot(centered_particles.T, centered_particles) / (particles.shape[0] - 1)
+    #     # Regularize the covariance matrix to ensure it's positive definite
+    #     covariance_matrix += 1e-6 * jnp.eye(covariance_matrix.shape[0])
+    #     # Compute the inverse mass matrix
+    #     inverse_mass_matrix = jnp.linalg.inv(covariance_matrix)
+    #     return inverse_mass_matrix
+
+    #  NOTE: b0,0 lower
+    b_0_0s = [0.01, 0.1, 0.25, 0.5, 0.75, 0.99]
+
     # TODO! REPEATED RUNS
     for b_0_0 in b_0_0s:
         b_0 = jnp.array([b_0_0, 0.0, 0.0])
-        # TODO: exact sampling
-        nuts_kernel = NUTS(numpyro_model_b0)
-        thinning = 10
-        num_chains = 16
-        mcmc = MCMC(nuts_kernel,
-                    num_warmup=20_000,
-                    num_samples=num_posterior_samples*thinning // num_chains,
-                    thinning=thinning,
-                    num_chains=num_chains
-                    )
-        mcmc.run(random.PRNGKey(1), obs=b_0,
-                #  init_params={'t1': 0., 't2': 0.},
-                 n_obs=n_obs)
-        mcmc.print_summary()
-        samples = mcmc.get_samples()
-        true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
+        tempered_smc = blackjax.adaptive_tempered_smc(
+            log_prior_fn,
+            lambda params: log_likelihood_fn(params, obs=b_0, n_obs=n_obs),
+            blackjax.hmc.build_kernel(),
+            blackjax.hmc.init,
+            hmc_parameters,
+            resampling.systematic,
+            0.75,
+            num_mcmc_steps=5,
+        )
+        initial_smc_state = tempered_smc.init(initial_particles)
+        key, sub_key = random.split(key)
+        n_iter, smc_state = smc_inference_loop(sub_key, tempered_smc.step, initial_smc_state)
+
+        print("Number of steps in the adaptive algorithm: ", n_iter)
+        true_posterior_samples = smc_state.particles
+        true_posterior_samples = 2 * expit(true_posterior_samples) - 1
+
+        # t1_samples = samples[:, 0]
+        # t2_samples = samples[:, 1]
+
+        #  TODO: exact sampling
+        # nuts_kernel = NUTS(numpyro_model_b0)
+        # thinning = 10
+        # num_chains = 16
+        # mcmc = MCMC(nuts_kernel,
+        #             num_warmup=20_000,
+        #             num_samples=num_posterior_samples*thinning // num_chains,
+        #             thinning=thinning,
+        #             num_chains=num_chains
+        #             )
+        # mcmc.run(random.PRNGKey(1), obs=b_0,
+        #         #  init_params={'t1': 0., 't2': 0.},
+        #          n_obs=n_obs)
+        # mcmc.print_summary()
+        # samples = mcmc.get_samples()
+        # true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
         plt.hist(true_posterior_samples[:, 0], bins=50)
         plt.savefig(f'{dirname}t1_posterior_exact_b_0_0_{b_0_0}.pdf')
         plt.clf()
@@ -158,193 +481,36 @@ def run_ma2_identifiable(*args, **kwargs):
         with open(f'{dirname}kl_{b_0_0}.txt', 'w') as f:
             f.write(str(kl))
 
-    # NOTE: b0, 1
-    b_0_1s = [0, 0.1, 0.5, 1.0][::-1]
-    for b_0_1 in b_0_1s:
-        b_0 = jnp.array([2.0, b_0_1, 0.0])
-        nuts_kernel = NUTS(numpyro_model_b0)
-        thinning = 10
-        mcmc = MCMC(nuts_kernel,
-                    num_warmup=2_000,
-                    num_samples=num_posterior_samples * thinning,
-                    thinning=thinning)
-        mcmc.run(random.PRNGKey(1), obs=b_0, init_params={'t1': 0., 't2': 0.}, n_obs=n_obs)
-        mcmc.print_summary()
-        samples = mcmc.get_samples()
-        true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
-        plt.hist(true_posterior_samples[:, 0], bins=50)
-        plt.savefig(f'{dirname}t1_posterior_exact_b_0_1_{b_0_1}.pdf')
+        # TODO! COMMENT BACK IN
+        t1s = jnp.linspace(-1.0, 1.0, num=100)
+        t2s = jnp.linspace(-1.0, 1.0, num=100)
+        log_pdfs = jnp.zeros((100, 100))
+        for ii, t1 in enumerate(t1s):
+            for jj, t2 in enumerate(t2s):
+                log_pdf = 0.0
+                for i in range(3):
+                    mean = autocov_exact(jnp.array([t1, t2]), i, 2)
+                    y_var = sample_autocov_variance(jnp.array([t1, t2]), i, n_obs, 2)
+                    y_stdev = jnp.sqrt(y_var)
+                    log_pdf += dist.Normal(mean, y_stdev).log_prob(b_0[i])
+
+                log_pdfs = log_pdfs.at[ii, jj].set(log_pdf)
+
+        plt.contourf(t1s, t2s, log_pdfs)
+        plt.savefig(f"{dirname}t1_t2_{b_0_0}_pdfs.pdf")
         plt.clf()
-
-        plt.hist(true_posterior_samples[:, 1], bins=50)
-        plt.savefig(f'{dirname}t2_posterior_exact_b_0_1_{b_0_1}.pdf')
-        plt.clf()
-
-        # TODO: flow samples
-        b_0_standardised = (b_0 - sim_summ_data_mean) / sim_summ_data_std
-        key, sub_key = random.split(key)
-        posterior_samples_original = flow.sample(sub_key,
-                                                 sample_shape=(num_posterior_samples,),
-                                                 condition=b_0_standardised)
-        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
-        posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
-        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
-        plt.hist(posterior_samples[:, 0], bins=50)
-        plt.savefig(f'{dirname}t1_posterior_flow_b_0_1_{b_0_1}.pdf')
-        plt.clf()
-
-        plt.hist(posterior_samples[:, 1], bins=50)
-        plt.savefig(f'{dirname}t2_posterior_flow_b_0_1_{b_0_1}.pdf')
-        plt.clf()
-
-        kl = kullback_leibler(true_posterior_samples, posterior_samples)
-        print(f"KL divergence for b_0_1 = {b_0_1}: {kl}")
-
-    # TODO: experiment on compatibility
-    # bs = [1.0, 1.5, 1.9, 1.99, 3, 4, 5]
-    for i in range(100):
-        # test_theta = jnp.array([1.99, 0.999])
-        y_obs_synth = jnp.array([
-            autocov_exact(true_params, 0, 2),
-            autocov_exact(true_params, 1, 2) + i * jnp.sqrt(sample_autocov_variance(true_params, 1, n_obs, 2)),
-            autocov_exact(true_params, 2, 2)
-            ])
-        y_obs_synth = (y_obs_synth - sim_summ_data_mean) / sim_summ_data_std
-
-        # TODO: QUICK ABC CHECK
-        distances = jnp.linalg.norm(sim_summ_data - y_obs_synth, axis=1)
-        cutoff_index = int(len(distances) * 0.01)
-        # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
-        closest_indices = jnp.argpartition(distances, cutoff_index)[:cutoff_index]
-        closest_simulations = sim_summ_data[closest_indices]
-        closest_t1 = t1_bounded[closest_indices]
-
-        # y_obs_synth = y_obs_synth.at[1].set()
-        key, sub_key = random.split(key)
-        posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=y_obs_synth)
-        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
-        posterior_samples = posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
-        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
-        _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
-        # plt.xlim(0, 1)
-        # plt.hist(true_posterior_samples[:, 0], bins=bins)
-        # print('')
-        plt.axvline(jnp.mean(closest_t1), color='red')
-        plt.savefig(f'{dirname}t1_posterior_identifiable_i_{i}.pdf')
-        plt.clf()
-
-        plt.hist(posterior_samples[:, 1], bins=50)
-        plt.savefig(f'{dirname}t2_posterior_identifiable_i_{i}.pdf')
-        plt.clf()
-
-    kl = kullback_leibler(true_posterior_samples, posterior_samples)
-
-    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
-                                               posterior_samples]))
-    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
-
-    with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
-        pkl.dump(posterior_samples, f)
-
-    with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
-        pkl.dump(true_posterior_samples, f)
-
-    with open(f'{dirname}kl.txt', 'w') as f:
-        f.write(str(kl))
-
-    with open(f'{dirname}mmd.txt', 'w') as f:
-        f.write(str(mmd))
-
-    num_coverage_samples = 100
-    coverage_levels = [0.8, 0.9, 0.95]
-
-    # bias/coverage for true parameter
-    true_params_unbounded = jnp.array([logit((true_params[0] + 2) / 4),
-                                       logit((true_params[1] + 1) / 2)])
-    true_params_standardised = (true_params_unbounded - thetas_mean) / thetas_std
-    bias = jnp.mean(posterior_samples, axis=0) - true_params
-    pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                          x_obs)
-    pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
-                                     descending=True)
-    pdf_theta = flow.log_prob(true_params_standardised, x_obs)
-    true_in_credible_interval = [0, 0, 0]
-    for i, level in enumerate(coverage_levels):
-        coverage_index = int(level * num_posterior_samples)
-        pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-        if pdf_theta > pdf_posterior_sample:
-            true_in_credible_interval[i] = 1
-
-    with open(f"{dirname}true_in_credible_interval.txt", "w") as f:
-        f.write(f"{true_in_credible_interval}\n")
-
-    with open(f"{dirname}true_bias.txt", "w") as f:
-        f.write(f"{bias}\n")
-
-    coverage_levels_counts = [0, 0, 0]
-    biases = jnp.array([])
-
-    for i in range(num_coverage_samples):
-        key, sub_key = random.split(key)
-        t1_bounded = CustomPrior_t1.rvs(2., size=(1,), key=sub_key)
-        t1 = logit((t1_bounded + 2) / 4)
-
-        key, sub_key = random.split(key)
-        t2_bounded = CustomPrior_t2.rvs(t1_bounded, 1., size=(1,), key=sub_key)
-        t2 = logit((t2_bounded + 1) / 2)
-        theta_draw_original = jnp.column_stack([t1_bounded, t2_bounded])
-        theta_draw = jnp.column_stack([t1, t2])
-
-        theta_draw = (theta_draw - thetas_mean) / thetas_std
-
-        key, sub_key = random.split(sub_key)
-        x_draw = get_summaries_batches(sub_key,
-                                       *theta_draw_original.T,
-                                       n_obs=n_obs,
-                                       n_sims=1, batch_size=1)
-        x_draw = (x_draw - sim_summ_data_mean) / sim_summ_data_std
-
-        posterior_samples_original = flow.sample(sub_key,
-                                                 sample_shape=(num_posterior_samples,),
-                                                 condition=x_draw)
-        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
-        posterior_samples = jnp.squeeze(posterior_samples)
-        posterior_samples = posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
-        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
-        bias = jnp.mean(posterior_samples, axis=0) - theta_draw_original
-        biases = jnp.concatenate((biases, bias.ravel()))
-        pdf_posterior_samples = flow.log_prob(posterior_samples_original,
-                                              x_draw)
-        pdf_posterior_samples = jnp.sort(pdf_posterior_samples.ravel(),
-                                         descending=True)
-        pdf_theta = flow.log_prob(theta_draw, x_draw)
-
-        for i, level in enumerate(coverage_levels):
-            coverage_index = int(level * num_posterior_samples)
-            pdf_posterior_sample = pdf_posterior_samples[coverage_index]
-            if pdf_theta > pdf_posterior_sample:
-                coverage_levels_counts[i] += 1
-
-    print(coverage_levels_counts)
-    estimated_coverage = jnp.array(coverage_levels_counts)/num_coverage_samples
-
-    with open(f"{dirname}coverage.txt", "w") as f:
-        f.write(f"{estimated_coverage}\n")
-
-    with open(f"{dirname}biases.txt", "w") as f:
-        f.write(f"{biases}\n")
 
     return kl, mmd
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog="run_ma2_identifiable.py",
+        prog="run_ma2_b0.py",
         description="Run MA(2) model.",
-        epilog="Example usage: python run_ma2_identifiabl.py"
+        epilog="Example usage: python run_ma2_b0.py"
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=1_000)
+    parser.add_argument("--n_sims", type=int, default=654321)
     args = parser.parse_args()
-    run_ma2_identifiable(args)
+    run_ma2_b0(args)
