@@ -179,17 +179,19 @@ def run_gnk_duodeciles(*args, **kwargs):
         plt.axvline(true_params[ii], color='black')
         plt.savefig(f'{dirname}posterior_samples_{ii}.pdf')
         plt.clf()
-    kl = kullback_leibler(true_posterior_samples, posterior_samples)
-
-    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
-                                               posterior_samples]))
-    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
     with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
         pkl.dump(true_posterior_samples, f)
+
+    kl = kullback_leibler(true_posterior_samples, posterior_samples)
+
+    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
+                                               posterior_samples]))
+    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
+
 
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))
