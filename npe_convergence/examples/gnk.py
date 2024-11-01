@@ -35,6 +35,13 @@ def gnk_density(x, A, B, g, k, c=0.8):
     return norm.pdf(z) / gnk_deriv(z, A, B, g, k, c)
 
 
+def gnk_density_from_z(z, A, B, g, k, c=0.8):
+    """Calculate the density of the g-and-k distribution given z."""
+    dQdz = gnk_deriv(z, A, B, g, k, c)
+    f_x = (norm.pdf(z) ** 2) / dQdz
+    return f_x
+
+
 def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size, sum_fn=None):
     if sum_fn is None:
         sum_fn = ss_octile
@@ -133,25 +140,73 @@ def sample_var_fn(p, A, B, g, k, n_obs):
     return res
 
 
+def compute_covariance_matrix(A, B, g, k, quantiles, n_obs, c=0.8):
+    """Compute the covariance matrix of the order statistics (quantiles) for the g-and-k distribution."""
+    m = len(quantiles)  # Number of quantiles
+    cov_matrix = jnp.zeros((m, m))
+
+    z = norm.ppf(quantiles)
+
+    f_x = gnk_density_from_z(z, A, B, g, k, c)
+
+    for i in range(m):
+        p_i = quantiles[i]
+        f_i = f_x[i]
+
+        var_i = p_i * (1 - p_i) / (n_obs * f_i ** 2)
+        cov_matrix = cov_matrix.at[i, i].set(var_i)
+
+        for j in range(i + 1, m):
+            p_j = quantiles[j]
+            f_j = f_x[j]
+
+            cov_ij = (jnp.minimum(p_i, p_j) - p_i * p_j) / (n_obs * f_i * f_j)
+            cov_matrix = cov_matrix.at[i, j].set(cov_ij)
+            cov_matrix = cov_matrix.at[j, i].set(cov_ij)  # Symmetric matrix
+
+    return cov_matrix
+
+
 def gnk_model(obs, n_obs):
-    """Model for the g-and-k distribution using Numpyro."""
+    """Model for the g-and-k distribution using Numpyro with a multivariate normal."""
+    # Sample parameters
     A = numpyro.sample('A', dist.Uniform(0, 10))
     B = numpyro.sample('B', dist.Uniform(0, 10))
     g = numpyro.sample('g', dist.Uniform(0, 10))
     k = numpyro.sample('k', dist.Uniform(0, 10))
 
-    # octiles = jnp.linspace(12.5, 87.5, 7) / 100
-    quantile_length = 100*(1/len(obs))
-    quantiles = jnp.linspace(quantile_length, 100-quantile_length, len(obs)) / 100
-    norm_quantiles = norm.ppf(quantiles)
-    expected_summaries = gnk(norm_quantiles, A, B, g, k)
+    quantile_length = 1 / (len(obs) + 1)
+    quantiles = jnp.linspace(quantile_length, 1 - quantile_length, len(obs))
+    z = norm.ppf(quantiles)
+    expected_summaries = gnk(z, A, B, g, k)
 
-    y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in quantiles]
-    for i in range(len(obs)):
-        numpyro.sample(f'y_{i}',
-                       dist.Normal(expected_summaries[i],
-                                   jnp.sqrt(y_variance[i])),
-                       obs=obs[i])
+    cov_matrix = compute_covariance_matrix(A, B, g, k, quantiles, n_obs)
+
+    jitter = 1e-6
+    cov_matrix += jitter * jnp.eye(len(obs))
+
+    numpyro.sample('obs', dist.MultivariateNormal(expected_summaries, cov_matrix), obs=obs)
+
+
+# def gnk_model(obs, n_obs):
+#     """Model for the g-and-k distribution using Numpyro."""
+#     A = numpyro.sample('A', dist.Uniform(0, 10))
+#     B = numpyro.sample('B', dist.Uniform(0, 10))
+#     g = numpyro.sample('g', dist.Uniform(0, 10))
+#     k = numpyro.sample('k', dist.Uniform(0, 10))
+
+#     # octiles = jnp.linspace(12.5, 87.5, 7) / 100
+#     quantile_length = 100*(1/len(obs))
+#     quantiles = jnp.linspace(quantile_length, 100-quantile_length, len(obs)) / 100
+#     norm_quantiles = norm.ppf(quantiles)
+#     expected_summaries = gnk(norm_quantiles, A, B, g, k)
+
+#     y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in quantiles]
+#     for i in range(len(obs)):
+#         numpyro.sample(f'y_{i}',
+#                        dist.Normal(expected_summaries[i],
+#                                    jnp.sqrt(y_variance[i])),
+#                        obs=obs[i])
 
 
 def gnk_model_narrow_prior(obs, n_obs):
@@ -175,7 +230,7 @@ def gnk_model_narrow_prior(obs, n_obs):
 
 def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     """Run the NUTS sampler."""
-    rng_key = random.PRNGKey(seed)
+    rng_key = random.key(seed)
     kernel = NUTS(gnk_model)
     thinning = 10
     num_chains = 4

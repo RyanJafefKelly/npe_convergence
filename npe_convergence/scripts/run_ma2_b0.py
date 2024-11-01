@@ -38,7 +38,7 @@ def run_ma2_b0(*args, **kwargs):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     true_params = jnp.array([0.6, 0.2])
-    key = random.PRNGKey(seed)
+    key = random.key(seed)
 
     key, sub_key = random.split(key)
     x_obs = get_summaries_batches(sub_key,
@@ -49,7 +49,7 @@ def run_ma2_b0(*args, **kwargs):
                                   1)
     x_obs_original = x_obs.copy()
 
-    num_posterior_samples = 10_000
+    num_posterior_samples = 4_000
 
     key, sub_key = random.split(key)
     t1 = random.uniform(sub_key, shape=(n_sims,))
@@ -115,18 +115,11 @@ def run_ma2_b0(*args, **kwargs):
                 num_warmup=2_000,
                 num_samples=num_posterior_samples * thinning,
                 thinning=thinning)
-    mcmc.run(random.PRNGKey(1), obs=x_obs_original,
+    mcmc.run(random.key(1), obs=x_obs_original,
              init_params={'t1': 0., 't2': 0.}, n_obs=n_obs)
     mcmc.print_summary()
     samples = mcmc.get_samples()
     true_posterior_samples = jnp.column_stack([samples['t1'], samples['t2']])
-    plt.hist(true_posterior_samples[:, 0], bins=50)
-    plt.savefig(f'{dirname}t1_posterior_exact.pdf')
-    plt.clf()
-
-    plt.hist(true_posterior_samples[:, 1], bins=50)
-    plt.savefig(f'{dirname}t2_posterior_exact.pdf')
-    plt.clf()
 
     key, sub_key = random.split(key)
     posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=x_obs)
@@ -134,15 +127,20 @@ def run_ma2_b0(*args, **kwargs):
     posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
     posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
     posterior_samples = jnp.squeeze(posterior_samples)
-    _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
 
+    # Plot t1 exact and flow samples
+    _, bins, _ = plt.hist(true_posterior_samples[:, 0], bins=50, alpha=0.5, label='Exact')
+    plt.hist(posterior_samples[:, 0], bins=bins, alpha=0.5, label='Flow')
+    plt.legend()
     plt.savefig(f'{dirname}t1_posterior.pdf')
     plt.clf()
 
-    plt.hist(posterior_samples[:, 1], bins=50)
+    # Plot t2 exact and flow samples
+    _, bins, _ = plt.hist(true_posterior_samples[:, 1], bins=50, alpha=0.5, label='Exact')
+    plt.hist(posterior_samples[:, 1], bins=bins, alpha=0.5, label='Flow')
+    plt.legend()
     plt.savefig(f'{dirname}t2_posterior.pdf')
     plt.clf()
-
     kl = kullback_leibler(true_posterior_samples,
                           posterior_samples)
 
@@ -255,27 +253,87 @@ def run_ma2_b0(*args, **kwargs):
             compute_log_prior_batch = jax.vmap(compute_log_prior_single)
             return compute_log_prior_batch(params)
 
+
+    def compute_gamma_h(thetas):
+        gamma_h = jnp.zeros(9)  # h from -4 to 4
+        h_vals = jnp.arange(-4, 5)
+        theta0 = 1.0
+
+        def gamma_fn(h):
+            abs_h = jnp.abs(h)
+            gamma = jnp.where(
+                abs_h == 0,
+                theta0 + thetas[0] ** 2 + thetas[1] ** 2,
+                jnp.where(
+                    abs_h == 1,
+                    thetas[0] + thetas[0] * thetas[1],
+                    jnp.where(abs_h == 2, thetas[1], 0.0),
+                ),
+            )
+            return gamma
+
+        gamma_h = jnp.array([gamma_fn(h) for h in h_vals])
+        return gamma_h
+
+    # Compute the covariance matrix of sample autocovariances
+    def compute_covariance_matrix(thetas, n_obs, max_lag=2):
+        gamma_h = compute_gamma_h(thetas)
+
+        num_lags = max_lag + 1
+        k_vals = jnp.arange(num_lags)
+        h_vals = jnp.arange(-2, 3)
+        i_vals = jnp.arange(-2, 3)
+
+        K1, K2 = jnp.meshgrid(k_vals, k_vals, indexing="ij")
+        delta_k = K1 - K2
+
+        # Compute S1
+        h_plus_delta = h_vals[:, None, None] + delta_k[None, :, :]
+        valid_S1 = (h_plus_delta >= -2) & (h_plus_delta <= 2)
+        h_indices = h_vals[:, None, None] + 4
+        h_plus_delta_indices = h_plus_delta + 4
+
+        gamma_h_values = gamma_h[h_indices]
+        gamma_h_plus_delta_values = gamma_h[h_plus_delta_indices]
+        gamma_products_S1 = gamma_h_values * gamma_h_plus_delta_values * valid_S1
+        S1 = jnp.sum(gamma_products_S1, axis=0)
+
+        # Compute S2
+        k1_plus_i = K1[None, :, :] + i_vals[:, None, None]
+        k2_minus_i = K2[None, :, :] - i_vals[:, None, None]
+        valid_S2 = (
+            (k1_plus_i >= -2)
+            & (k1_plus_i <= 2)
+            & (k2_minus_i >= -2)
+            & (k2_minus_i <= 2)
+        )
+        k1_plus_i_indices = k1_plus_i + 4
+        k2_minus_i_indices = k2_minus_i + 4
+
+        gamma_k1_i = gamma_h[k1_plus_i_indices]
+        gamma_k2_i = gamma_h[k2_minus_i_indices]
+        gamma_products_S2 = gamma_k1_i * gamma_k2_i * valid_S2
+        S2 = jnp.sum(gamma_products_S2, axis=0)
+
+        cov_matrix = (S1 + S2) / n_obs
+        return cov_matrix
+
+
     def compute_log_likelihood_single(theta, obs, n_obs=100):
         ma_order = 2
         thetas = 2 * expit(theta) - 1
 
-        # Compute y_variance
-        y_variance = jnp.array([
-            sample_autocov_variance(thetas, k, n_obs, ma_order)
-            for k in range(ma_order + 1)
-        ])
+        mean = jnp.array(
+            [autocov_exact(thetas, k, ma_order) for k in range(ma_order + 1)]
+        )
 
-        # Compute mean
-        mean = jnp.array([
-            autocov_exact(thetas, i, ma_order)
-            for i in range(ma_order + 1)
-        ])
+        cov_matrix = compute_covariance_matrix(thetas, n_obs, max_lag=ma_order)
+        jitter = 1e-6
+        cov_matrix += jitter * jnp.eye(ma_order + 1)
 
-        stdev = jnp.sqrt(y_variance)
-        log_probs = dist.Normal(mean, stdev).log_prob(obs)
-        log_lik = jnp.sum(log_probs)
-
+        log_lik = dist.MultivariateNormal(mean, cov_matrix).log_prob(obs)
         return log_lik
+
 
     def log_likelihood_fn(params, obs, n_obs=100):
         # Check if params is batched or unbatched
@@ -370,8 +428,8 @@ def run_ma2_b0(*args, **kwargs):
         b_0_standardised = (b_0 - sim_summ_data_mean) / sim_summ_data_std
         key, sub_key = random.split(key)
         posterior_samples_original = flow.sample(sub_key,
-                                                 sample_shape=(num_posterior_samples,),
-                                                 condition=b_0_standardised)
+                                                sample_shape=(num_posterior_samples,),
+                                                condition=b_0_standardised)
         posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
         posterior_samples = posterior_samples.at[:, 0].set(2 * expit(posterior_samples[:, 0]) - 1)
         posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
@@ -388,23 +446,23 @@ def run_ma2_b0(*args, **kwargs):
         with open(f'{dirname}kl_{b_0_0}.txt', 'w') as f:
             f.write(str(kl))
 
-        t1s = jnp.linspace(-1.0, 1.0, num=100)
-        t2s = jnp.linspace(-1.0, 1.0, num=100)
-        log_pdfs = jnp.zeros((100, 100))
-        for ii, t1 in enumerate(t1s):
-            for jj, t2 in enumerate(t2s):
-                log_pdf = 0.0
-                for i in range(3):
-                    mean = autocov_exact(jnp.array([t1, t2]), i, 2)
-                    y_var = sample_autocov_variance(jnp.array([t1, t2]), i, n_obs, 2)
-                    y_stdev = jnp.sqrt(y_var)
-                    log_pdf += dist.Normal(mean, y_stdev).log_prob(b_0[i])
+        # t1s = jnp.linspace(-1.0, 1.0, num=100)
+        # t2s = jnp.linspace(-1.0, 1.0, num=100)
+        # log_pdfs = jnp.zeros((100, 100))
+        # for ii, t1 in enumerate(t1s):
+        #     for jj, t2 in enumerate(t2s):
+        #         log_pdf = 0.0
+        #         for i in range(3):
+        #             mean = autocov_exact(jnp.array([t1, t2]), i, 2)
+        #             y_var = sample_autocov_variance(jnp.array([t1, t2]), i, n_obs, 2)
+        #             y_stdev = jnp.sqrt(y_var)
+        #             log_pdf += dist.Normal(mean, y_stdev).log_prob(b_0[i])
 
-                log_pdfs = log_pdfs.at[ii, jj].set(log_pdf)
+        #         log_pdfs = log_pdfs.at[ii, jj].set(log_pdf)
 
-        plt.contourf(t1s, t2s, log_pdfs)
-        plt.savefig(f"{dirname}t1_t2_{b_0_0}_pdfs.pdf")
-        plt.clf()
+        # plt.contourf(t1s, t2s, log_pdfs)
+        # plt.savefig(f"{dirname}t1_t2_{b_0_0}_pdfs.pdf")
+        # plt.clf()
 
     return kl, mmd
 
@@ -416,7 +474,7 @@ if __name__ == '__main__':
         epilog="Example usage: python run_ma2_b0.py"
     )
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=654321)
+    parser.add_argument("--n_obs", type=int, default=5000)
+    parser.add_argument("--n_sims", type=int, default=333_333)
     args = parser.parse_args()
     run_ma2_b0(args)

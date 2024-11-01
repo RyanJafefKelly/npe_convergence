@@ -34,10 +34,9 @@ def run_gnk_duodeciles(*args, **kwargs):
     dirname = "res/gnk_duodeciles/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-    # key = random.PRNGKey(1)
     a, b, g, k = 3.0, 1.0, 2.0, 0.5
     true_params = jnp.array([a, b, g, k])
-    key = random.PRNGKey(seed)
+    key = random.key(seed)
 
     z = random.normal(key, shape=(n_obs,))
     plt.hist(z.ravel(), bins=50)
@@ -75,7 +74,7 @@ def run_gnk_duodeciles(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000
+    num_posterior_samples = 4_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -191,7 +190,6 @@ def run_gnk_duodeciles(*args, **kwargs):
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
                                                posterior_samples]))
     mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
-
 
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))

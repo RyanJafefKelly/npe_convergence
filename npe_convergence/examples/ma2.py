@@ -171,45 +171,164 @@ class CustomPrior_t2:
         return (x >= locs) & (x <= locs + scales) * (1 / jnp.where(scales > 0, scales, 1))
 
 
+def compute_gamma_h(thetas):
+    """Compute γ(h) for h in -4 to 4."""
+    theta0 = 1.0  # White noise variance
+    gamma_h = jnp.zeros(9)  # h from -4 to 4
+    h_vals = jnp.arange(-4, 5)
+
+    # Compute γ(h)
+    def gamma_fn(h):
+        abs_h = jnp.abs(h)
+        gamma_h = jnp.where(
+            abs_h == 0,
+            theta0 + thetas[0]**2 + thetas[1]**2,
+            jnp.where(
+                abs_h == 1,
+                thetas[0] + thetas[0]*thetas[1],
+                jnp.where(
+                    abs_h == 2,
+                    thetas[1],
+                    0.0
+                )
+            )
+        )
+        return gamma_h
+
+    gamma_h = jnp.array([gamma_fn(h) for h in h_vals])
+
+    return gamma_h
+
+
+def compute_covariance_matrix(thetas, n_obs, max_lag=2):
+    """Compute covariance matrix of sample autocovariances at lags 0 to max_lag."""
+    gamma_h = compute_gamma_h(thetas)  # γ(h) for h in -4 to 4
+
+    # Number of lags
+    num_lags = max_lag + 1  # Lags 0 to max_lag
+    k_vals = jnp.arange(num_lags)
+
+    # h and i values
+    h_vals = jnp.arange(-2, 3)
+    i_vals = jnp.arange(-2, 3)
+
+    # Precompute indices
+    # gamma_indices = jnp.arange(-4, 5) + 4  # Adjust for zero-based indexing
+
+    # Prepare matrices for k1 and k2
+    K1, K2 = jnp.meshgrid(k_vals, k_vals, indexing='ij')
+    delta_k = K1 - K2
+
+    # Compute S1
+    h_plus_delta = h_vals.reshape(-1, 1, 1) + delta_k  # Shape (5, num_lags, num_lags)
+    valid_S1 = (h_plus_delta >= -4) & (h_plus_delta <= 4)
+    h_indices = h_vals.reshape(-1, 1, 1) + 4
+    h_plus_delta_indices = (h_plus_delta + 4) % 9
+
+    gamma_h_values = gamma_h[h_indices]
+    gamma_h_plus_delta_values = gamma_h[h_plus_delta_indices]
+    gamma_products_S1 = gamma_h_values * gamma_h_plus_delta_values * valid_S1
+    S1 = jnp.sum(gamma_products_S1, axis=0)  # Sum over h_vals
+
+    # Compute S2
+    k1_plus_i = K1.reshape(1, num_lags, num_lags) + i_vals.reshape(-1, 1, 1)
+    k2_minus_i = K2.reshape(1, num_lags, num_lags) - i_vals.reshape(-1, 1, 1)
+
+    valid_S2 = (k1_plus_i >= -4) & (k1_plus_i <= 4) & (k2_minus_i >= -4) & (k2_minus_i <= 4)
+    k1_plus_i_indices = (k1_plus_i + 4) % 9
+    k2_minus_i_indices = (k2_minus_i + 4) % 9
+
+    gamma_k1_i = gamma_h[k1_plus_i_indices]
+    gamma_k2_i = gamma_h[k2_minus_i_indices]
+    gamma_products_S2 = gamma_k1_i * gamma_k2_i * valid_S2
+    S2 = jnp.sum(gamma_products_S2, axis=0)  # Sum over i_vals
+
+    cov_matrix = (S1 + S2) / n_obs
+
+    return cov_matrix
+
+
 def numpyro_model(obs, a=2, n_obs=100):
     ma_order = 2
+    # Sample parameters
     t1 = numpyro.sample('t1', dist.Uniform(-a, a))
     locs = jnp.maximum(-a - t1, -a + t1)
     scales = a - locs
     t2 = numpyro.sample('t2', dist.Uniform(locs, locs + scales))
     thetas = jnp.array([t1, t2])
-    y_variance = numpyro.deterministic(
-        "y_variance",
-        jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
-                   for k in range(0, ma_order+1)])
-    )
 
-    mean = numpyro.deterministic(
-        "mean",
-        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
-    )
+    # Compute expected summaries (means)
+    mean = jnp.array([autocov_exact(thetas, k, ma_order) for k in range(0, ma_order+1)])
 
-    stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+    # Compute covariance matrix
+    cov_matrix = compute_covariance_matrix(thetas, n_obs, max_lag=ma_order)
 
-    numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
+    # Add jitter for numerical stability
+    jitter = 1e-6
+    cov_matrix += jitter * jnp.eye(ma_order + 1)
+
+    # Sample from multivariate normal distribution
+    numpyro.sample('obs', dist.MultivariateNormal(mean, cov_matrix), obs=obs)
 
 
+# def numpyro_model(obs, a=2, n_obs=100):
+#     ma_order = 2
+#     t1 = numpyro.sample('t1', dist.Uniform(-a, a))
+#     locs = jnp.maximum(-a - t1, -a + t1)
+#     scales = a - locs
+#     t2 = numpyro.sample('t2', dist.Uniform(locs, locs + scales))
+#     thetas = jnp.array([t1, t2])
+#     y_variance = numpyro.deterministic(
+#         "y_variance",
+#         jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
+#                    for k in range(0, ma_order+1)])
+#     )
+
+#     mean = numpyro.deterministic(
+#         "mean",
+#         jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
+#     )
+
+#     stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+
+#     numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
 def numpyro_model_b0(obs, n_obs=100):
     ma_order = 2
+    # Sample parameters
     t1 = numpyro.sample('t1', dist.Uniform(-1, 1))
     t2 = numpyro.sample('t2', dist.Uniform(-1, 1))
     thetas = jnp.array([t1, t2])
-    y_variance = numpyro.deterministic(
-        "y_variance",
-        jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
-                   for k in range(0, ma_order+1)])
-    )
 
-    mean = numpyro.deterministic(
-        "mean",
-        jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
-    )
+    # Compute expected summaries (means)
+    mean = jnp.array([autocov_exact(thetas, k, ma_order) for k in range(0, ma_order+1)])
 
-    stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+    # Compute covariance matrix
+    cov_matrix = compute_covariance_matrix(thetas, n_obs, max_lag=ma_order)
 
-    numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
+    # Add jitter for numerical stability
+    jitter = 1e-6
+    cov_matrix += jitter * jnp.eye(ma_order + 1)
+
+    # Sample from multivariate normal distribution
+    numpyro.sample('obs', dist.MultivariateNormal(mean, cov_matrix), obs=obs)
+
+
+# def numpyro_model_b0(obs, n_obs=100):
+#     ma_order = 2
+#     t1 = numpyro.sample('t1', dist.Uniform(-1, 1))
+#     t2 = numpyro.sample('t2', dist.Uniform(-1, 1))
+#     thetas = jnp.array([t1, t2])
+#     y_variance = numpyro.deterministic(
+#         "y_variance",
+#         jnp.array([sample_autocov_variance(thetas, k, n_obs, ma_order)
+#                    for k in range(0, ma_order+1)])
+#     )
+
+#     mean = numpyro.deterministic(
+#         "mean",
+#         jnp.array([autocov_exact(thetas, i, ma_order) for i in range(0, ma_order+1)])
+#     )
+
+#     stdev = numpyro.deterministic("stdev", jnp.sqrt(y_variance))
+
+#     numpyro.sample('obs', dist.Normal(mean, stdev), obs=obs)
