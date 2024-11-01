@@ -29,6 +29,12 @@ def ss_duodecile(y):
     return jnp.percentile(y, duodeciles, axis=-1)
 
 
+def ss_hexadeciles(y):
+    """Calculate hexadeciles of the input data."""
+    hexadeciles = jnp.linspace(6.25, 93.75, 15)
+    return jnp.percentile(y, hexadeciles, axis=-1)
+
+
 def gnk_density(x, A, B, g, k, c=0.8):
     """Calculate the density of the g-and-k distribution."""
     z = pgk(x, A, B, g, k, c, zscale=True)
