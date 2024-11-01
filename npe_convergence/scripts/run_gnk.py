@@ -75,7 +75,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 4_000  # TODO! UPDATE BACK TO 10_000
+    num_posterior_samples = 10_000  # TODO! UPDATE BACK TO 10_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
@@ -252,6 +252,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=123456)
+    parser.add_argument("--n_sims", type=int, default=10_000)
     args = parser.parse_args()
     run_gnk(args)

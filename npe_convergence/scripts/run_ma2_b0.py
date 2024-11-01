@@ -49,7 +49,7 @@ def run_ma2_b0(*args, **kwargs):
                                   1)
     x_obs_original = x_obs.copy()
 
-    num_posterior_samples = 4_000
+    num_posterior_samples = 10_000
 
     key, sub_key = random.split(key)
     t1 = random.uniform(sub_key, shape=(n_sims,))

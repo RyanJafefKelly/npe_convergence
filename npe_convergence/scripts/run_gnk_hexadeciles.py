@@ -18,12 +18,12 @@ from flowjax.flows import coupling_flow  # type: ignore
 from flowjax.train.data_fit import fit_to_data  # type: ignore
 from jax.scipy.special import expit, logit
 
-from npe_convergence.examples.gnk import gnk, run_nuts, ss_duodecile, get_summaries_batches
+from npe_convergence.examples.gnk import gnk, run_nuts, ss_hexadeciles, get_summaries_batches
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
 
-def run_gnk_duodeciles(*args, **kwargs):
+def run_gnk_hexadeciles(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
     except ValueError:
@@ -31,7 +31,7 @@ def run_gnk_duodeciles(*args, **kwargs):
         seed = args.seed
         n_obs = args.n_obs
         n_sims = args.n_sims
-    dirname = "res/gnk_duodeciles/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    dirname = "res/gnk_hexadeciles/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     a, b, g, k = 3.0, 1.0, 2.0, 0.5
@@ -49,7 +49,7 @@ def run_gnk_duodeciles(*args, **kwargs):
     plt.savefig(dirname + "x_obs.pdf")
     plt.clf()
     x_obs = jnp.atleast_2d(x_obs)
-    x_obs = ss_duodecile(x_obs)
+    x_obs = ss_hexadeciles(x_obs)
     x_obs = jnp.squeeze(x_obs)
     # x_obs_original = x_obs.copy()
     print("x_obs: ", x_obs)
@@ -115,7 +115,7 @@ def run_gnk_duodeciles(*args, **kwargs):
     key, sub_key = random.split(key)
     x_sims = get_summaries_batches(sub_key, A, B, g, k, n_obs, n_sims,
                                    batch_size=batch_size,
-                                   sum_fn=ss_duodecile)
+                                   sum_fn=ss_hexadeciles)
     # x = gnk(z, A[None, :], B[None, :], g[None, :], k[None, :])
     # x = x.T  # TODO: shouldn't have to do this
 
@@ -135,7 +135,7 @@ def run_gnk_duodeciles(*args, **kwargs):
 
     key, sub_key = random.split(key)
     theta_dims = 4
-    summary_dims = 11
+    summary_dims = 15
     flow = coupling_flow(
         key=sub_key,
         base_dist=Normal(jnp.zeros(theta_dims)),
@@ -216,7 +216,7 @@ def run_gnk_duodeciles(*args, **kwargs):
                                       A, B, g, k,
                                       n_obs=n_obs,
                                       n_sims=1, batch_size=1,
-                                      sum_fn=ss_duodecile)
+                                      sum_fn=ss_hexadeciles)
         x_obs = jnp.squeeze(x_obs)
         x_obs = (x_obs - sim_summ_data_mean) / sim_summ_data_std
         # condition and draw from posterior
@@ -249,12 +249,12 @@ def run_gnk_duodeciles(*args, **kwargs):
 if __name__ == "__main__":
     numpyro.set_host_device_count(4)
     parser = argparse.ArgumentParser(
-        prog="run_gnk_duodeciles.py",
+        prog="run_gnk_hexadeciles.py",
         description="Run gnk model.",
-        epilog="Example usage: python run_gnk_duodeciles.py"
+        epilog="Example usage: python run_gnk_hexadeciles.py"
     )
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=10_000)
+    parser.add_argument("--n_obs", type=int, default=5_000)
+    parser.add_argument("--n_sims", type=int, default=300_000)
     args = parser.parse_args()
-    run_gnk_duodeciles(args)
+    run_gnk_hexadeciles(args)
