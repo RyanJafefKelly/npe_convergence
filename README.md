@@ -1,1 +1,1 @@
-Experiment code for paper "The Statistical Accuracy of Sequential Neural Posterior Inference"
+Experiment code for paper "The Statistical Accuracy of Neural Posterior and Likelihood Estimation"
