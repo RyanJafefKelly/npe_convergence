@@ -13,6 +13,7 @@ from jax.scipy.special import expit, logit
 from numpyro.infer import MCMC, NUTS  # type: ignore
 
 from npe_convergence.examples.ma2 import (MA2, CustomPrior_t1, CustomPrior_t2,
+                                          autocov_exact, sample_autocov_variance,
                                           autocov, numpyro_model,
                                           get_summaries_batches)
 from npe_convergence.metrics import (kullback_leibler, median_heuristic,
@@ -168,6 +169,43 @@ def run_ma2_identifiable(*args, **kwargs):
     plt.savefig(f'{dirname}ppc_ac2_identifiable.pdf')
     plt.clf()
 
+    # TODO: experiment on compatibility
+    # bs = [1.0, 1.5, 1.9, 1.99, 3, 4, 5]
+    for i in range(100):
+        # test_theta = jnp.array([1.99, 0.999])
+        y_obs_synth = jnp.array([
+            autocov_exact(true_params, 0, 2),
+            autocov_exact(true_params, 1, 2) + i * jnp.sqrt(sample_autocov_variance(true_params, 1, n_obs, 2)),
+            autocov_exact(true_params, 2, 2)
+            ])
+        y_obs_synth = (y_obs_synth - sim_summ_data_mean) / sim_summ_data_std
+
+        # TODO: QUICK ABC CHECK
+        distances = jnp.linalg.norm(sim_summ_data - y_obs_synth, axis=1)
+        cutoff_index = int(len(distances) * 0.01)
+        # closest_distances = np.partition(distances, cutoff_index)[:cutoff_index]
+        closest_indices = jnp.argpartition(distances, cutoff_index)[:cutoff_index]
+        closest_simulations = sim_summ_data[closest_indices]
+        closest_t1 = t1_bounded[closest_indices]
+
+        # y_obs_synth = y_obs_synth.at[1].set()
+        key, sub_key = random.split(key)
+        posterior_samples_original = flow.sample(sub_key, sample_shape=(num_posterior_samples,), condition=y_obs_synth)
+        posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
+        posterior_samples = posterior_samples.at[:, 0].set(4 * expit(posterior_samples[:, 0]) - 2)
+        posterior_samples = posterior_samples.at[:, 1].set(2 * expit(posterior_samples[:, 1]) - 1)
+        _, bins, _ = plt.hist(posterior_samples[:, 0], bins=50)
+        # plt.xlim(0, 1)
+        # plt.hist(true_posterior_samples[:, 0], bins=bins)
+        # print('')
+        plt.axvline(jnp.mean(closest_t1), color='red')
+        plt.savefig(f'{dirname}t1_posterior_identifiable_i_{i}.pdf')
+        plt.clf()
+
+        plt.hist(posterior_samples[:, 1], bins=50)
+        plt.savefig(f'{dirname}t2_posterior_identifiable_i_{i}.pdf')
+        plt.clf()
+
     kl = kullback_leibler(true_posterior_samples, posterior_samples)
 
     lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
@@ -276,6 +314,6 @@ if __name__ == '__main__':
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_obs", type=int, default=1_000)
-    parser.add_argument("--n_sims", type=int, default=100_000)
+    parser.add_argument("--n_sims", type=int, default=1_000_000)
     args = parser.parse_args()
     run_ma2_identifiable(args)

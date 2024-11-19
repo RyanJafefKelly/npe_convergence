@@ -75,7 +75,7 @@ def run_gnk(*args, **kwargs):
     key, subkey = random.split(key)
 
     # NOTE: first get true thetas
-    num_posterior_samples = 10_000  # TODO! UPDATE BACK TO 10_000
+    num_posterior_samples = 10_000
     num_warmup = 10_000
     mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
                     num_samples=num_posterior_samples, num_warmup=num_warmup)
