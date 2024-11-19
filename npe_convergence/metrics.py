@@ -80,8 +80,6 @@ def kullback_leibler(true_samples, sim_samples):
     n, d = true_samples.shape
     m, _ = sim_samples.shape
 
-    # TODO?: For fun, could implement k-d tree in JAX?
-
     true_tree = KDTree(true_samples)
     sim_tree = KDTree(sim_samples)
 
