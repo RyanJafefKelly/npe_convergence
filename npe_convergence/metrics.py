@@ -1,4 +1,4 @@
-"""Metrics."""
+"""Sample-based metrics between two statistical distributions."""
 
 import jax.numpy as jnp
 import numpy as np
@@ -7,6 +7,7 @@ from scipy.spatial import KDTree  # type: ignore
 
 
 def rbf_kernel(x, y, lengthscale=1.0):
+    """Compute the RBF kernel between two sets of points."""
     return jnp.exp(-jnp.sum((x - y) ** 2) / (2 * lengthscale ** 2))
 
 
@@ -18,11 +19,13 @@ def median_heuristic(x, batch_size=1000):
         start = i * batch_size
         end = min((i + 1) * batch_size, n)
         batch = x[start:end]
-        dists = jnp.sqrt(jnp.sum((batch[:, None, :] - x[None, :, :]) ** 2, axis=-1))
+        dists = jnp.sqrt(jnp.sum((batch[:, None, :] - x[None, :, :]) ** 2,
+                                 axis=-1))
         return dists.ravel()
 
     num_batches = (n + batch_size - 1) // batch_size
-    all_dists = jnp.concatenate([batch_distances(i) for i in range(num_batches)])
+    all_dists = jnp.concatenate([batch_distances(i)
+                                 for i in range(num_batches)])
 
     return jnp.sqrt(jnp.median(all_dists) / 2)  # NOTE: memory-intensive step
 
@@ -58,23 +61,18 @@ def unbiased_mmd(npe_posterior_samples: Array,
     return mmd_value
 
 
-def total_variation(P, Q):
-    # TODO: return max over grid
-    # TODO? Check same number of points
-    pass
-
-
 def kullback_leibler(true_samples, sim_samples):
-    """_summary_
+    """Compute the Kullback-Leibler divergence between two sets of samples.
 
     Args:
-        true_samples (_type_): _description_
-        sim_samples (_type_): _description_
+        true_samples (jax.Array): samples from the true distribution
+        sim_samples (jax.Array): samples from the simulated distribution
 
     Returns:
-        kl_estimate _type_: _description_
+        kl_estimate (float): estimate of the KL divergence
 
-    See Pérez-Cruz...
+    See Pérez-Cruz (2008) "Kullback-Leibler divergence estimation of continuous
+    distributions" for more details.
     """
     true_samples = np.array(true_samples)
     sim_samples = np.array(sim_samples)
