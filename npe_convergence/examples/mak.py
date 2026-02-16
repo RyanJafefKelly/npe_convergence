@@ -1,3 +1,4 @@
+# ruff: noqa: F722
 """Moving average of order k model."""
 
 import jax.numpy as jnp

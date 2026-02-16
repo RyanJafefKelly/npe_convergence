@@ -11,7 +11,6 @@ Usage:
 import argparse
 import os
 import pickle as pkl
-from xml.parsers.expat import model
 
 import jax.numpy as jnp
 import jax.random as random

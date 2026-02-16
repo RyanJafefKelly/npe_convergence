@@ -1,3 +1,4 @@
+# ruff: noqa: F722
 """Sample-based metrics between two statistical distributions."""
 
 import jax.numpy as jnp

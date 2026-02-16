@@ -1,3 +1,4 @@
+# ruff: noqa: F722
 """Conditional Gaussian approximation for neural posterior estimation.
 
 Replaces the normalising flow in standard NPE with a neural network that
