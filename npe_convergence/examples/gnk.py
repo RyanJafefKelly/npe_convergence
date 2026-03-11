@@ -42,9 +42,13 @@ def gnk_density(x, A, B, g, k, c=0.8):
 
 
 def gnk_density_from_z(z, A, B, g, k, c=0.8):
-    """Calculate the density of the g-and-k distribution given z."""
+    """Calculate the density of the g-and-k distribution given z.
+
+    For X = Q(Z) with Z ~ N(0,1), the change-of-variables formula gives
+    f_X(x) = phi(z) / Q'(z), where z = Q^{-1}(x).
+    """
     dQdz = gnk_deriv(z, A, B, g, k, c)
-    f_x = (norm.pdf(z) ** 2) / dQdz
+    f_x = norm.pdf(z) / dQdz
     return f_x
 
 

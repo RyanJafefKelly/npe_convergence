@@ -37,7 +37,7 @@ from npe_convergence.metrics import kullback_leibler, median_heuristic, unbiased
 
 
 def _nuts_cache_path(n_obs: int, seed: int) -> str:
-    return f"res/gnk/nuts_cache_n_obs_{n_obs}_seed_{seed}.pkl"
+    return f"res/gnk/nuts_cache_v2_n_obs_{n_obs}_seed_{seed}.pkl"
 
 
 def get_nuts_posterior(
@@ -156,7 +156,7 @@ def run_gnk_gaussian(*args, **kwargs):
         lr=5e-4,
         batch_size=256,
         max_epochs=2000,
-        patience=10,
+        patience=200,
     )
     model, losses = fit(
         model,
@@ -198,7 +198,7 @@ def run_gnk_gaussian(*args, **kwargs):
         plt.clf()
 
     # -- Metrics (thin to avoid OOM on pairwise distances) ------------------
-    n_metric = 400
+    n_metric = 2000
     key, subkey = random.split(key)
     idx_npe = random.permutation(subkey, posterior_samples.shape[0])[:n_metric]
     key, subkey = random.split(key)
@@ -216,6 +216,7 @@ def run_gnk_gaussian(*args, **kwargs):
         pkl.dump(posterior_samples, f)
     with open(f"{dirname}true_posterior_samples.pkl", "wb") as f:
         pkl.dump(true_posterior_samples, f)
+    np.save(f"{dirname}x_obs.npy", x_obs)
     with open(f"{dirname}kl.txt", "w") as f:
         f.write(str(kl))
     with open(f"{dirname}mmd.txt", "w") as f:
@@ -229,7 +230,6 @@ def run_gnk_gaussian(*args, **kwargs):
 
     for i in range(num_coverage_samples):
         key, subkey = random.split(key)
-        z_cov = random.normal(subkey, shape=(n_obs,))
         x_obs_cov = get_summaries_batches(
             subkey,
             jnp.array([a]),

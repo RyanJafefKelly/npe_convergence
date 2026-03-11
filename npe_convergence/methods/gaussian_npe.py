@@ -127,7 +127,7 @@ class TrainConfig(NamedTuple):
     lr: float = 5e-4
     batch_size: int = 256
     max_epochs: int = 2000
-    patience: int = 10
+    patience: int = 200
     val_frac: float = 0.1
 
 
@@ -174,7 +174,7 @@ def fit(
     val_losses: list[float] = []
 
     n_train = t_train.shape[0]
-    n_batches = max(1, n_train // config.batch_size)
+    n_batches = max(1, -(-n_train // config.batch_size))  # ceiling division
 
     for epoch in range(config.max_epochs):
         key, subkey = jr.split(key)
@@ -182,7 +182,9 @@ def fit(
         epoch_loss = 0.0
 
         for b in range(n_batches):
-            idx = idx_perm[b * config.batch_size : (b + 1) * config.batch_size]
+            start = b * config.batch_size
+            end = min(start + config.batch_size, n_train)
+            idx = idx_perm[start:end]
             model, opt_state, loss = step(model, opt_state, t_train[idx], s_train[idx])
             epoch_loss += float(loss)
 
