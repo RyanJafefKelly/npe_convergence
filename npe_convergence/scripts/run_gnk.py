@@ -154,7 +154,7 @@ def run_gnk(*args, **kwargs):
         condition=sim_summ_data,
         learning_rate=5e-4,  # TODO: could experiment with
         max_epochs=2000,
-        max_patience=10,
+        max_patience=200,
         batch_size=256,
     )
 
@@ -177,17 +177,24 @@ def run_gnk(*args, **kwargs):
         plt.axvline(true_params[ii], color='black')
         plt.savefig(f'{dirname}posterior_samples_{ii}.pdf')
         plt.clf()
-    kl = kullback_leibler(true_posterior_samples, posterior_samples)
+    n_metric = 2000
+    key, sub_key = random.split(key)
+    idx_npe = random.permutation(sub_key, posterior_samples.shape[0])[:n_metric]
+    key, sub_key = random.split(key)
+    idx_true = random.permutation(sub_key, true_posterior_samples.shape[0])[:n_metric]
+    ps_thin = posterior_samples[idx_npe]
+    ts_thin = true_posterior_samples[idx_true]
 
-    lengthscale = median_heuristic(jnp.vstack([true_posterior_samples,
-                                               posterior_samples]))
-    mmd = unbiased_mmd(true_posterior_samples, posterior_samples, lengthscale)
+    kl = kullback_leibler(ts_thin, ps_thin)
+    lengthscale = median_heuristic(jnp.vstack([ts_thin, ps_thin]))
+    mmd = unbiased_mmd(ts_thin, ps_thin, lengthscale)
 
     with open(f'{dirname}posterior_samples.pkl', 'wb') as f:
         pkl.dump(posterior_samples, f)
 
     with open(f'{dirname}true_posterior_samples.pkl', 'wb') as f:
         pkl.dump(true_posterior_samples, f)
+    np.save(f"{dirname}x_obs.npy", x_obs)
 
     with open(f'{dirname}kl.txt', 'w') as f:
         f.write(str(kl))
@@ -201,10 +208,7 @@ def run_gnk(*args, **kwargs):
     biases = jnp.array([])
 
     for i in range(num_coverage_samples):
-        # Fixed true param
-        # generate x_obs
         key, sub_key = random.split(key)
-        z = random.normal(sub_key, shape=(n_obs,))
         A, B, g, k = true_params
         A = jnp.array([A])
         B = jnp.array([B])
