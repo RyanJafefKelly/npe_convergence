@@ -3,8 +3,9 @@ import math
 import numpy as np
 
 
-def run_experiment(experiment_fn, seed: int = 0, **kwargs):
-    n_obs = [100, 500, 1000, 5000]
+def run_experiment(experiment_fn, seed: int = 0, n_obs=None, **kwargs):
+    if n_obs is None:
+        n_obs = [100, 500, 1000, 5000]
 
     n_sims = [lambda n: n,
               lambda n: int(n * math.log(n)),
@@ -21,7 +22,7 @@ def run_experiment(experiment_fn, seed: int = 0, **kwargs):
             # else:
             try:
                 kl, mmd = experiment_fn(seed, n, f(n), **kwargs)
-            except ValueError as e:
+            except Exception as e:
                 kl = None
                 mmd = None
                 print(f"Error: {e}")

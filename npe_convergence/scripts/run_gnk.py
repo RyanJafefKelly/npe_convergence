@@ -23,6 +23,69 @@ from npe_convergence.metrics import (kullback_leibler, median_heuristic,
                                      unbiased_mmd)
 
 
+# ---------------------------------------------------------------------------
+# NUTS caching
+# ---------------------------------------------------------------------------
+
+
+def _nuts_cache_path_flow(n_obs: int, seed: int) -> str:
+    return f"res/gnk/nuts_cache_v2_flow_n_obs_{n_obs}_seed_{seed}.pkl"
+
+
+def get_nuts_posterior_flow(
+    seed: int,
+    x_obs: jnp.ndarray,
+    n_obs: int,
+    dirname: str,
+    num_samples: int = 10_000,
+    num_warmup: int = 10_000,
+) -> jnp.ndarray:
+    """Load cached NUTS samples or run + cache if not found.
+
+    On cache miss, also creates arviz diagnostic plots in *dirname*.
+    Returns array of shape (num_samples, 4) with columns [A, B, g, k].
+    """
+    cache_path = _nuts_cache_path_flow(n_obs, seed)
+    if os.path.exists(cache_path):
+        print(f"Loading cached NUTS posterior from {cache_path}")
+        with open(cache_path, "rb") as f:
+            return pkl.load(f)
+
+    print("Running NUTS (will cache for future runs)...")
+    mcmc = run_nuts(
+        seed=1, obs=x_obs, n_obs=n_obs,
+        num_samples=num_samples, num_warmup=num_warmup,
+    )
+    mcmc.print_summary()
+
+    # Diagnostic plots (only on first run for this n_obs/seed)
+    inference_data = az.from_numpyro(mcmc)
+    az.plot_trace(inference_data, compact=False)
+    plt.savefig(f"{dirname}traceplots.png")
+    plt.close()
+    az.plot_ess(inference_data, kind="evolution")
+    plt.savefig(f"{dirname}ess_plots.png")
+    plt.close()
+    az.plot_autocorr(inference_data)
+    plt.savefig(f"{dirname}autocorr.png")
+    plt.close()
+
+    samples_dict = mcmc.get_samples()
+    param_names = ["A", "B", "g", "k"]
+    samples = jnp.column_stack([samples_dict[p] for p in param_names])
+
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, "wb") as f:
+        pkl.dump(samples, f)
+    print(f"Cached NUTS posterior to {cache_path}")
+    return samples
+
+
+# ---------------------------------------------------------------------------
+# Main experiment
+# ---------------------------------------------------------------------------
+
+
 def run_gnk(*args, **kwargs):
     try:
         seed, n_obs, n_sims = args
@@ -74,27 +137,16 @@ def run_gnk(*args, **kwargs):
 
     key, subkey = random.split(key)
 
-    # NOTE: first get true thetas
+    # NOTE: first get true thetas (cached across N values for same n_obs/seed)
     num_posterior_samples = 10_000
-    num_warmup = 10_000
-    mcmc = run_nuts(seed=1, obs=x_obs, n_obs=n_obs,
-                    num_samples=num_posterior_samples, num_warmup=num_warmup)
-    mcmc.print_summary()
-    inference_data = az.from_numpyro(mcmc)
-    true_thetas = mcmc.get_samples()
-    az.plot_trace(inference_data, compact=False)
-    plt.savefig(f"{dirname}traceplots.png")
-    plt.close()
-    az.plot_ess(inference_data, kind="evolution")
-    plt.savefig(f"{dirname}ess_plots.png")
-    plt.close()
-    az.plot_autocorr(inference_data)
-    plt.savefig(f"{dirname}autocorr.png")
-    plt.close()
+    true_posterior_samples = get_nuts_posterior_flow(
+        seed, x_obs, n_obs, dirname,
+        num_samples=num_posterior_samples,
+    )
 
     posterior_params = ['A', 'B', 'g', 'k']
     for ii, param in enumerate(posterior_params):
-        plt.hist(true_thetas[param], bins=50, label=param)
+        plt.hist(true_posterior_samples[:, ii], bins=50, label=param)
         plt.legend()
         plt.axvline(true_params[ii], color='red')
         plt.savefig(dirname + f"true_samples_{param}.pdf")
@@ -168,11 +220,9 @@ def run_gnk(*args, **kwargs):
     posterior_samples = (posterior_samples_original * thetas_std) + thetas_mean
     posterior_samples = expit(posterior_samples) * 10
 
-    true_posterior_samples = jnp.zeros((num_posterior_samples, 4))  # TODO: ugly... just make a matrix from start
-    for ii, (k, v) in enumerate(true_thetas.items()):
-        true_posterior_samples = true_posterior_samples.at[:, ii].set(v)
+    for ii, param in enumerate(posterior_params):
         _, bins, _ = plt.hist(posterior_samples[:, ii], bins=50, alpha=0.8, label='NPE')
-        plt.hist(v, bins=bins, alpha=0.8, label='true')
+        plt.hist(true_posterior_samples[:, ii], bins=bins, alpha=0.8, label='true')
         plt.legend()
         plt.axvline(true_params[ii], color='black')
         plt.savefig(f'{dirname}posterior_samples_{ii}.pdf')
