@@ -63,7 +63,8 @@ def autocov(x, lag=1):
 
     """
     x = jnp.atleast_2d(x)
-    C = jnp.mean(x[:, lag:] * x[:, :-lag], axis=1)
+    n = x.shape[1]
+    C = jnp.sum(x[:, lag:] * x[:, :-lag], axis=1) / n
     return C
 
 
@@ -78,10 +79,10 @@ def get_summaries(x):
     -------
     summaries : jnp.array of shape (n_samples, 3)
     """
-    var_x = jnp.var(x, axis=1)
+    gamma0 = jnp.mean(x ** 2, axis=1)  # (1/n) * sum X_t^2; no mean subtraction
     acov1 = autocov(x, lag=1)
     acov2 = autocov(x, lag=2)
-    summaries = jnp.stack((var_x, acov1, acov2), axis=1)
+    summaries = jnp.stack((gamma0, acov1, acov2), axis=1)
     return summaries
 
 
