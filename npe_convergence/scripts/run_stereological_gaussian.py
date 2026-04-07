@@ -51,7 +51,7 @@ def run_stereological_gaussian(*args, **kwargs):
 
     key, subkey = random.split(key)
     x_obs = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
-    x_obs = get_summaries(x_obs)
+    x_obs = jnp.squeeze(get_summaries(x_obs))
     x_obs_original = x_obs.copy()
     print("x_obs:", x_obs)
 
@@ -95,7 +95,7 @@ def run_stereological_gaussian(*args, **kwargs):
         lr=5e-4,
         batch_size=256,
         max_epochs=2000,
-        patience=200,
+        patience=20,
     )
     model, losses = fit(
         model,
@@ -146,7 +146,7 @@ def run_stereological_gaussian(*args, **kwargs):
     for i in range(num_coverage_samples):
         key, subkey = random.split(key)
         x_obs_cov = stereological(subkey, *true_params, num_samples=1, n_obs=n_obs)
-        x_obs_cov = get_summaries(x_obs_cov)
+        x_obs_cov = jnp.squeeze(get_summaries(x_obs_cov))
         x_obs_cov = (x_obs_cov - sim_summ_data_mean) / sim_summ_data_std
 
         key, subkey = random.split(key)

@@ -89,7 +89,7 @@ def run_stereological(*args, **kwargs):
         condition=sim_summ_data,
         learning_rate=5e-4,  # TODO: could experiment with
         max_epochs=2000,
-        max_patience=200,
+        max_patience=20,
         batch_size=256,
     )
 
