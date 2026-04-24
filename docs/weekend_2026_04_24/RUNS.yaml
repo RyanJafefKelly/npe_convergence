@@ -1,0 +1,90 @@
+runs:
+  - id: gnk-n500-oracle-gate
+    status: pending
+    branch: exp/oracle-gate-n500
+    command: null
+    inputs:
+      cache: null
+    outputs: []
+    decision_needed: "Use n=500 or n=1000 for high-budget HPC?"
+    notes: "Compute theta-space Gaussian oracle KL K_theta^*(n=500) from existing cached NUTS posterior samples. Do not retrain NPE or overwrite caches."
+
+  - id: gnk-coordinate-u-kl-decomp
+    status: pending
+    branch: exp/u-space-kl-decomp
+    command: null
+    inputs:
+      cache: null
+    outputs: []
+    decision_needed: null
+    notes: "Keep theta-space BvM oracle KL, u-space oracle KL, coordinate offset, and native u-space Gaussian-NPE error separate."
+
+  - id: gnk-log-corrected-scaling
+    status: pending
+    branch: exp/log-corrected-scaling
+    command: null
+    inputs:
+      aggregate_table: null
+    outputs: []
+    decision_needed: null
+    notes: "Preserve x = N/(d^2 n) plot and add x_log = N/(d^2 n log(N)^2) using natural logs unless current scripts specify otherwise."
+
+  - id: gnk-hpc-calibration
+    status: blocked
+    blocked_by:
+      - gnk-n500-oracle-gate
+    branch: exp/hpc-calibration
+    command: null
+    n_candidate:
+      - 500
+      - 1000
+    x_grid_candidate:
+      - 25
+      - 50
+      - 100
+      - 200
+      - 500
+    outputs: []
+    decision_needed: "After calibration, decide whether the full high-budget array is feasible and which x grid to submit."
+    notes: "Start with one calibration job only. Full array submission requires explicit review of a dry-run table."
+
+  - id: gnk-model-control-pilot
+    status: blocked
+    blocked_by:
+      - gnk-hpc-calibration
+    branch: exp/gnk-model-control
+    command: null
+    inputs:
+      simulator: gnk_asymptotic_mvn
+    outputs: []
+    decision_needed: "Does residual persist when NPE training simulator matches the NUTS reference likelihood?"
+    notes: "Pilot only; do not make gnk_model the default simulator and do not overwrite empirical-GNK caches."
+
+  - id: gnk-hexadecile-aggregation
+    status: pending
+    branch: exp/hexadecile-aggregation
+    command: null
+    inputs:
+      cache: res/gnk_hexadeciles/
+    outputs: []
+    decision_needed: null
+    notes: "Use summary-specific oracle and d = d_s + d_theta; expected hexadecile d_s = 15 and d_total = 19."
+
+  - id: ma2-b0-compatibility
+    status: pending
+    branch: exp/ma2-compatibility
+    command: null
+    inputs:
+      cache: null
+    outputs: []
+    decision_needed: null
+    notes: "Compatibility failure only. Do not include MA2-b0 in pooled BvM-rate fits or Gaussian-NPE family-sufficiency narrative."
+
+  - id: stereological-check
+    status: deferred
+    branch: null
+    command: null
+    inputs: {}
+    outputs: []
+    decision_needed: null
+    notes: "Run only if nearly automatic after higher-priority GNK and MA2-b0 tasks."
