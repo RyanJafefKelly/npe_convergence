@@ -1,0 +1,108 @@
+task: gnk-hpc-calibration
+run_id: gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
+created_at_utc: '2026-04-25T06:50:35Z'
+git_commit: a428ac2
+git_dirty: true
+branch: exp-hpc-calibration
+method: Gaussian-NPE
+simulator: empirical_gnk_prior_predictive_octile_summaries
+n: 500
+d_s: 7
+d_theta: 4
+d: 11
+x: 50
+N: 3025000
+observed_seed: 88
+simulation_seed: 88
+training_seed: 88
+posterior_sampling_seed: 88
+output_dir: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
+gpu_requested: false
+scheduler_resource_request:
+  scheduler: PBS
+  job_type: single_non_array
+  walltime: '47:00:00'
+  mem: 64GB
+  ncpus: 4
+  ngpus: 0
+seed_selection:
+  seed: 88
+  rule: closest finite Delta_u_total to the median among n=500, N=250000 complete-seed
+    rows
+  source_csv: notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv
+  source_rows: 101
+  median_Delta_u_total: 2.634332000648568
+  selected_seed_Delta_u_total: 2.634332000648568
+  fallback_used: false
+selection_rationale: Selected x=50 because it is the preferred calibration point,
+  the resolved N=3,025,000 is below the existing cached n=5000, N=25,000,000 scale,
+  and the repository already has PBS patterns using 47-48h and 64GB. The job remains
+  a single non-array run.
+train_config:
+  lr: 0.0005
+  batch_size: 256
+  max_epochs: 2000
+  patience: 200
+  val_frac: 0.1
+  hidden_dims:
+  - 128
+  - 128
+expected_outputs: &id001
+  output_dir: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
+  config: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml
+  validation_curve: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv
+  validation_curve_plot: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.pdf
+  predicted_u_mean_cov: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz
+  samples_10k: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz
+  timing_metadata: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json
+  stdout_log: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log
+  stderr_log: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log
+dry_run_rows:
+- n: 500
+  x: 25
+  N: 1512500
+  seed: 88
+  method: Gaussian-NPE
+  simulator: empirical_gnk_prior_predictive_octile_summaries
+  selected: false
+  run_id: gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z
+  paths:
+    output_dir: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z
+    config: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/config.yaml
+    validation_curve: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/validation_curve.csv
+    validation_curve_plot: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/validation_curve.pdf
+    predicted_u_mean_cov: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz
+    samples_10k: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/posterior_samples_10k.npz
+    timing_metadata: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/timing_metadata.json
+    stdout_log: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/logs/stdout.log
+    stderr_log: res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/logs/stderr.log
+  exists:
+    output_dir: false
+    config: false
+    validation_curve: false
+    validation_curve_plot: false
+    predicted_u_mean_cov: false
+    samples_10k: false
+    timing_metadata: false
+    stdout_log: false
+    stderr_log: false
+- n: 500
+  x: 50
+  N: 3025000
+  seed: 88
+  method: Gaussian-NPE
+  simulator: empirical_gnk_prior_predictive_octile_summaries
+  selected: true
+  run_id: gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
+  paths: *id001
+  exists:
+    output_dir: false
+    config: false
+    validation_curve: false
+    validation_curve_plot: false
+    predicted_u_mean_cov: false
+    samples_10k: false
+    timing_metadata: false
+    stdout_log: false
+    stderr_log: false
+full_array_submitted: false

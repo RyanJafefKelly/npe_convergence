@@ -57,9 +57,9 @@ runs:
     notes: "Preserves x = N/(d^2 n) and adds x_log = N/(d^2 n log(N)^2) in a companion two-panel scaled-budget figure with shared y-axis. Natural logs are used. The dotted reference overlay is proportional to log(N)/sqrt(N/(d^2 n)); equivalently proportional to 1/sqrt(x_log) in the log-corrected panel. The log-corrected panel is a finite-N visualisation of the existing BvM logarithmic factor, not a new rate."
 
   - id: gnk-hpc-calibration
-    status: pending
+    status: prepared
     branch: exp-hpc-calibration
-    command: null
+    command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
     selected_n: 500
     n_candidate:
       - 500
@@ -70,9 +70,71 @@ runs:
       - 100
       - 200
       - 500
-    outputs: []
+    calibration_candidates:
+      - n: 500
+        x: 25
+        N: 1512500
+        seed: 88
+        selected: false
+        output_dir: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z"
+        config_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/config.yaml"
+        validation_curve_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/validation_curve.csv"
+        predicted_u_mean_cov_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz"
+        sample_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/posterior_samples_10k.npz"
+        timing_metadata_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/timing_metadata.json"
+        stdout_log_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/logs/stdout.log"
+        stderr_log_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x25_seed88_20260425T065035Z/logs/stderr.log"
+        selected_output_collisions_at_prepare_time: false
+      - n: 500
+        x: 50
+        N: 3025000
+        seed: 88
+        selected: true
+        output_dir: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
+        config_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
+        validation_curve_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv"
+        predicted_u_mean_cov_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz"
+        sample_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz"
+        timing_metadata_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json"
+        stdout_log_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log"
+        stderr_log_path: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log"
+        selected_output_collisions_at_prepare_time: false
+    selected_calibration_x: 50
+    resolved_N: 3025000
+    seed: 88
+    seed_selection:
+      rule: "Choose the seed whose cached Delta_u_total is closest to the median among finite complete-seed rows with n=500 and N=250000 in notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv."
+      source_rows: 101
+      median_Delta_u_total: 2.634332000648568
+      selected_seed_Delta_u_total: 2.634332000648568
+      fallback_used: false
+    dry_run_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
+    prepare_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --write-config --selected-x 50 --created-at 2026-04-25T06:50:35Z --run-id gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
+    submit_command: "qsub npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh"
+    scheduler_job_id: null
+    output_dir: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
+    expected_outputs:
+      config: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
+      validation_curve: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv"
+      validation_curve_plot: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.pdf"
+      predicted_u_mean_cov: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz"
+      samples_10k: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz"
+      timing_metadata: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json"
+      stdout_log: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log"
+      stderr_log: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log"
+    scheduler_resource_request:
+      scheduler: PBS
+      job_type: single_non_array
+      walltime: "47:00:00"
+      mem: 64GB
+      ncpus: 4
+      ngpus: 0
+    outputs:
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
+      - "npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py"
+      - "npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh"
     decision_needed: "After calibration, decide whether the full high-budget array is feasible and which x grid to submit."
-    notes: "n=500 passed the median-based oracle gate but is borderline. Start with one n=500 calibration job only. Full array submission remains blocked until timing/output metadata and a dry-run table are explicitly reviewed."
+    notes: "Prepared exactly one non-array n=500 Gaussian-NPE calibration job. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 is plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. This local machine is not an HPC submit environment, so no job was submitted and no full array was submitted. Full high-budget array remains blocked pending review of this calibration result and dry-run table."
 
   - id: gnk-model-control-pilot
     status: blocked
