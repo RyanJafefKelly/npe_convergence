@@ -168,7 +168,7 @@ path.
 - Method: Gaussian-NPE only.
 - Branch: `exp-gnk-model-control`.
 - Simulator-control code commit: `5d0f573`.
-- Metadata/config commit: pending retry metadata commit.
+- Metadata/config commit: `49e50b9`.
 - Retry config records git hash `5d0f573` and `model_control_code_commit: 5d0f573`; dirty state was true at prepare time because unrelated pre-existing local files were dirty/untracked in the worktree.
 - n: 500.
 - d_s: 7; d_theta: 4; d: 11.

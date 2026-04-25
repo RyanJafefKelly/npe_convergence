@@ -205,7 +205,7 @@ runs:
     branch: exp-gnk-model-control
     commit_hash: 5d0f573
     model_control_code_commit: 5d0f573
-    metadata_config_commit: pending_retry_metadata_commit
+    metadata_config_commit: 49e50b9
     git_dirty_at_prepare_time: true
     simulator_flag: gnk_asymptotic_mvn
     empirical_simulator_name: gnk_empirical_quantile
