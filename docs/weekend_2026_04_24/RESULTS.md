@@ -119,8 +119,8 @@ log-corrected panel.
 
 ## HPC Calibration
 
-Status: submitted. Full high-budget array submission remains blocked pending
-completion, timing/output-integrity review, and explicit dry-run review.
+Status: completed. Full high-budget array submission remains blocked pending
+explicit review and decision using this calibration result.
 
 - Selected n: 500.
 - Calibration x: 50.
@@ -137,7 +137,18 @@ completion, timing/output-integrity review, and explicit dry-run review.
 - Sample path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`.
 - Stdout log path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log`.
 - Stderr log path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log`.
-- Recommendation for full array: pending until job completion and output-integrity/timing review.
+- Exit status: 0.
+- Runtime: total wall time 23,405.01 seconds (scheduler wall time 06:30:34); CPU time 07:28:10.
+- Runtime split: simulation 207.65 seconds; training 23,180.03 seconds; posterior sampling 0.22 seconds.
+- Throughput: 14,567.43 simulations/second; 125,019.23 training examples/second; 0.04133 epochs/second.
+- Training epochs: 958 validation-curve rows excluding the header; final validation NLL -1.345737.
+- Memory: `ru_maxrss=1775196` KB; PBS `resources_used.mem=1713584kb`, `vmem=3248044kb`.
+- Hardware: CPU node `cpu1n040`, AMD EPYC 9684X 96-Core Processor; no GPU.
+- Output integrity: required runtime outputs are present locally; `stderr.log` is empty. The `timing_metadata.json` self-check reports stdout/stderr/timing_metadata as false because it checked existence before final PBS log flush and before writing `timing_metadata.json`; post-run file inventory confirms these files exist.
+- Posterior output shape: `posterior_samples_10k.npz` contains `theta`, `u`, and `eta` arrays of shape `(10000, 4)`.
+- Predicted u-space Gaussian output shape: `gaussian_npe_u_posterior.npz` contains `mu_u` shape `(4,)` and `cov_u` shape `(4,4)`.
+- Diagnostics: `kl_theta_knn_2000=2.3282495190889403`, `mmd_theta_2000=0.21408498287200928`; these are calibration diagnostics, not a full-array result.
+- Recommendation for full array: operationally, x=50 appears feasible for individual jobs under the tested 47h/64GB PBS request because this job completed in about 6.5h and used about 1.7GB RSS. A full high-budget array should still wait for explicit review of queue cost, desired x grid, and whether to run x=25/x=50 only before larger x values.
 - Note: no full high-budget array was submitted.
 
 ## gnk_model Simulator-Control Pilot

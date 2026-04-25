@@ -1,0 +1,39 @@
+
+PBS Job 20344975.aqua
+CPU time         : 07:28:10
+Wall time        : 06:30:34
+Mem usage        : 1713584kb
+
+--- Job Runtime Information at 2026-04-25T23:59:16.954965---
+id               : 20344975.aqua
+Job_Name         : gnk_gnpe_cal_n500_x50_s88
+Job_Owner        : n9751041@aquarius02.ib0.hpc.qut.edu.au
+resources_used   : cput=07:28:10,mem=1713584kb,walltime=06:30:34,ncpus=4,cpupercent=96,vmem=3248044kb,cpus="105,111,132,187",ngpus=0
+job_state        : 5
+queue            : cpu_batch_exec
+server           : aqua
+Checkpoint       : u
+Error_Path       : aquarius02.ib0.hpc.qut.edu.au:/home/n9751041/npe_convergence/res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log
+exec_host2       : cpu1n040.ib0.hpc.qut.edu.au:15002/19*4
+exec_vnode       : (cpu1n040[1]:mem=64gb:ncpus=4:nfpgas=0:ngpus=0)
+Join_Path        : n
+Keep_Files       : n
+mtime            : 2026-04-25T17:28:43
+Output_Path      : aquarius02.ib0.hpc.qut.edu.au:/home/n9751041/npe_convergence/res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log
+Resource_List    : mem=64gb,walltime=47:00:00,ncpus=4,place=pack
+schedselect      : 1:cpu_id=any:mem=64gb:ncpus=4:nfpgas=0:ngpus=0:qlist=cpu_batch_exec
+stime            : 2026-04-25T17:28:41
+session_id       : 605432
+substate         : 50
+Variable_List    : PBS_O_HOME=/home/n9751041,PBS_O_LANG=en_US.UTF-8,PBS_O_LOGNAME=n9751041,PBS_O_PATH=/home/n9751041/.local/bin:/pkg/suse12/software/anaconda3/2019.10/bin:/pkg/suse12/software/anaconda3/2019.10/condabin:/home/n9751041/.local/bin:/home/n9751041/bin:/opt/clmgr/sbin:/opt/clmgr/bin:/opt/sgi/sbin:/opt/sgi/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/c3/bin:/opt/pbs/bin:/sbin:/bin,PBS_O_MAIL=/var/spool/mail/n9751041,PBS_O_SHELL=/usr/local/qutsh/bin/qutsh,PBS_O_INTERACTIVE_AUTH_METHOD=resvport,PBS_O_HOST=aquarius02.ib0.hpc.qut.edu.au,PBS_O_WORKDIR=/mnt/hpccs01/home/n9751041/npe_convergence,PBS_O_SYSTEM=Linux,PBS_O_QUEUE=cpu_batch
+euser            : n9751041
+egroup           : default
+hashname         : 20344975.aqua
+run_count        : 1
+job_kill_delay   : 10
+Exit_status      : 0
+project          : _pbs_project_default
+run_version      : 1
+Submit_Host      : aquarius02.ib0.hpc.qut.edu.au
+Submit_arguments : npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh 
+ctime            : 2026-04-25T17:28:28

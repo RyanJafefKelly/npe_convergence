@@ -57,7 +57,7 @@ runs:
     notes: "Preserves x = N/(d^2 n) and adds x_log = N/(d^2 n log(N)^2) in a companion two-panel scaled-budget figure with shared y-axis. Natural logs are used. The dotted reference overlay is proportional to log(N)/sqrt(N/(d^2 n)); equivalently proportional to 1/sqrt(x_log) in the log-corrected panel. The log-corrected panel is a finite-N visualisation of the existing BvM logarithmic factor, not a new rate."
 
   - id: gnk-hpc-calibration
-    status: submitted
+    status: completed
     branch: exp-hpc-calibration
     command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
     selected_n: 500
@@ -147,12 +147,57 @@ runs:
       mem: 64GB
       ncpus: 4
       ngpus: 0
+    observed_runtime:
+      exit_status: 0
+      failure_reason: null
+      hostname: cpu1n040
+      start_timestamp_utc: "2026-04-25T07:29:11Z"
+      end_timestamp_utc: "2026-04-25T13:59:16Z"
+      total_wall_time_seconds: 23405.006843750016
+      scheduler_walltime: "06:30:34"
+      scheduler_cpu_time: "07:28:10"
+      simulation_time_seconds: 207.65497182297986
+      training_time_seconds: 23180.034683543025
+      posterior_sampling_time_seconds: 0.21772489103022963
+      simulations_per_second: 14567.433533827108
+      training_examples_per_second: 125019.22622477516
+      epochs_per_second: 0.041328669826371955
+      validation_epochs: 958
+      peak_memory_kb_ru_maxrss: 1775196
+      scheduler_mem_used_kb: 1713584
+      scheduler_vmem_used_kb: 3248044
+      gpu_info: null
+      cpu_model: "AMD EPYC 9684X 96-Core Processor"
+    output_integrity_review:
+      required_outputs_present: true
+      stderr_log_bytes: 0
+      validation_curve_rows_including_header: 959
+      posterior_sample_shapes:
+        theta: [10000, 4]
+        u: [10000, 4]
+        eta: [10000, 4]
+      u_posterior_shapes:
+        mu_u: [4]
+        cov_u: [4, 4]
+      timing_metadata_self_integrity_note: "timing_metadata.json reports stdout/stderr/timing_metadata as false because integrity was checked before final PBS log flush and before timing_metadata.json itself was written; local post-run file inventory confirms these files exist, with stderr empty."
+      metrics:
+        kl_theta_knn_2000: 2.3282495190889403
+        mmd_theta_2000: 0.21408498287200928
     outputs:
       - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/metrics.json"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples.pkl"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.pdf"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log"
+      - "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log"
       - "npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py"
       - "npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh"
-    decision_needed: "After calibration, decide whether the full high-budget array is feasible and which x grid to submit."
-    notes: "Submitted exactly one non-array n=500 Gaussian-NPE calibration job on Aquarius as PBS job 20344975.aqua after the HPC dry-run showed no selected-runtime-output collisions beyond the existing config. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 is plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. No full array was submitted. Full high-budget array remains blocked pending review of this calibration result and output-integrity/timing metadata."
+    decision_needed: "Decide whether a full high-budget array is feasible and which x grid to submit."
+    notes: "Completed exactly one non-array n=500 Gaussian-NPE calibration job on Aquarius as PBS job 20344975.aqua after the HPC dry-run showed no selected-runtime-output collisions beyond the existing config. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 was plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. Observed wall time was about 6.5 hours with about 1.7GB peak RSS; training dominated runtime. No full array was submitted. Full high-budget array remains blocked pending explicit review/decision using this calibration result."
 
   - id: gnk-model-control-pilot
     status: blocked
