@@ -91,16 +91,31 @@ u-space target and may differ slightly after diagonal standardisation.
 
 ## Log-Corrected Scaled-Budget Plots
 
-Status: pending.
+Status: completed.
 
-Required record:
+Added a companion scaled-budget figure derived from the existing reviewed GNK
+u-space Gaussian-NPE decomposition CSV, not from a fresh compute pass. The
+figure preserves the original scaled budget axis `x = N/(d_total^2 n)` in the
+left panel and adds the log-corrected finite-N axis
+`x_log = N/(d_total^2 n log(N)^2)` in the right panel, with a shared y-axis for
+median `Delta_N,u`. The dotted reference overlay is proportional to
+`log(N)/sqrt(N/(d_total^2 n))`, equivalently `1/sqrt(x_log)` in the
+log-corrected panel.
 
-- Command:
-- Commit hash:
-- Input table path:
+- Command: `python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_N_gt_n --exclude-N-equals-n --min-seeds 101`
+- Commit hash recorded in output metadata: `f2b995e`.
+- Created at: `2026-04-25T06:24:44.778617+00:00`.
+- Plotting script: `scripts/plot_gnk_u_space_kl_decomp.py`.
+- Input table path: `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`.
+- Cache access: no cache files were read or overwritten by this plotting command.
+- Main plotting filter: excludes `N=n` and requires at least 101 seeds per `(n,N)` group, leaving 12 plotted groups and 1,212 per-seed rows.
 - Figure paths:
-- Whether natural logs were used:
-- Neutral interpretation:
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_mean_cov.pdf`
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_coord_offset_vs_n.pdf`
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_total_scaled_budget_log_corrected.pdf`
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_plot_metadata.json`
+- Whether natural logs were used: yes. The current scaled-budget plotting script did not previously specify a log-correction convention, so the new `x_log` panel uses natural logs.
+- Neutral interpretation: the figure plots median `Delta_N,u`, the native u-space Gaussian-NPE error, after excluding `N=n` and incomplete seed-count groups. The `d_total^2 n` scaling organises the curves across `n` better than raw budget alone. The log-corrected scaled-budget panel shows somewhat improved cross-`n` alignment relative to the original scaled budget, especially in the low-to-mid cached budget range, but residual separation remains. The log-corrected axis retains the BvM corollary's existing logarithmic factor in the finite-`N` visualisation; it is not a new rate. The log factor helps explain why apparently large values of `N/(d_total^2 n)` can remain pre-asymptotic at the cached budgets.
 
 ## HPC Calibration
 

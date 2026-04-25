@@ -42,14 +42,19 @@ runs:
     notes: "K_theta^* remains the theta-space BvM-premise diagnostic. coord_offset=K_u^*-K_theta^* is the coordinate-projection offset. Delta_N,u is native u-space Gaussian-NPE approximation error reconstructed from saved Gaussian-NPE posterior samples, not a pure BvM residual. Scientific-code review found no mathematical blocker after excluding the one-seed diagnostic row from the main plot and qualifying finite-sample kNN affine-invariance wording."
 
   - id: gnk-log-corrected-scaling
-    status: pending
+    status: completed
     branch: exp-log-corrected-scaling
-    command: null
+    command: "python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_N_gt_n --exclude-N-equals-n --min-seeds 101"
     inputs:
-      aggregate_table: null
-    outputs: []
+      aggregate_table: "notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv"
+      note: "Plot-only task derived from the existing reviewed decomposition CSV; no fresh compute or retraining was run. Main theorem-facing scaled-budget panel excludes N=n and requires at least 101 seeds per (n,N) group. Uses native u-space Gaussian-NPE Delta_u_total from the reviewed decomposition table."
+    outputs:
+      - notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_mean_cov.pdf
+      - notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_coord_offset_vs_n.pdf
+      - notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_total_scaled_budget_log_corrected.pdf
+      - notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_plot_metadata.json
     decision_needed: null
-    notes: "Preserve x = N/(d^2 n) plot and add x_log = N/(d^2 n log(N)^2) using natural logs unless current scripts specify otherwise."
+    notes: "Preserves x = N/(d^2 n) and adds x_log = N/(d^2 n log(N)^2) in a companion two-panel scaled-budget figure with shared y-axis. Natural logs are used. The dotted reference overlay is proportional to log(N)/sqrt(N/(d^2 n)); equivalently proportional to 1/sqrt(x_log) in the log-corrected panel. The log-corrected panel is a finite-N visualisation of the existing BvM logarithmic factor, not a new rate."
 
   - id: gnk-hpc-calibration
     status: pending

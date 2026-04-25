@@ -110,6 +110,116 @@ def plot_delta_components(
     return plot_df
 
 
+def plot_scaled_budget(
+    plot_df: pd.DataFrame,
+    out_path: Path,
+    min_N_over_n: float,
+    exclude_N_equals_n: bool,
+    min_seeds: int,
+) -> pd.DataFrame:
+    grouped = (
+        plot_df.assign(
+            scaled_budget_log=lambda x: x["scaled_budget"] / np.log(x["N"].to_numpy(dtype=float)) ** 2
+        )
+        .groupby(["n", "N", "scaled_budget", "scaled_budget_log"], as_index=False)
+        .agg(
+            Delta_u_total_median=("Delta_u_total", "median"),
+            Delta_u_total_q25=("Delta_u_total", lambda s: s.quantile(0.25)),
+            Delta_u_total_q75=("Delta_u_total", lambda s: s.quantile(0.75)),
+            n_seeds=("seed", "nunique"),
+        )
+        .sort_values(["n", "scaled_budget", "N"])
+        .reset_index(drop=True)
+    )
+    if grouped.empty:
+        raise SystemExit("No grouped rows remain for the scaled-budget plot")
+
+    n_values = sorted(grouped["n"].unique())
+    cmap = plt.colormaps["viridis"]
+    colors = {n: cmap(i / max(1, len(n_values) - 1)) for i, n in enumerate(n_values)}
+
+    fig, axes = plt.subplots(1, 2, figsize=(13.2, 5.2), sharey=True)
+    panels = [
+        (
+            axes[0],
+            "scaled_budget",
+            r"$x = N/(d_{\mathrm{total}}^2 n)$",
+            r"Original scaled budget $x$",
+        ),
+        (
+            axes[1],
+            "scaled_budget_log",
+            r"$x_{\log} = N/(d_{\mathrm{total}}^2 n\,\log(N)^2)$",
+            r"Log-corrected scaled budget $x_{\log}$",
+        ),
+    ]
+
+    for ax, x_col, xlabel, title in panels:
+        for n in n_values:
+            sub = grouped[grouped["n"] == n].sort_values(x_col)
+            x = sub[x_col].to_numpy(dtype=float)
+            med = sub["Delta_u_total_median"].to_numpy(dtype=float)
+            q25 = sub["Delta_u_total_q25"].to_numpy(dtype=float)
+            q75 = sub["Delta_u_total_q75"].to_numpy(dtype=float)
+            ax.plot(x, med, marker="o", color=colors[n], linewidth=1.4, label=f"n={int(n)}")
+            ax.fill_between(x, q25, q75, color=colors[n], alpha=0.16, linewidth=0.0)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel(xlabel)
+        ax.set_title(title)
+        ax.grid(True, which="both", alpha=0.22)
+
+    ref = np.log(grouped["N"].to_numpy(dtype=float)) / np.sqrt(grouped["scaled_budget"].to_numpy(dtype=float))
+    med_y = grouped["Delta_u_total_median"].to_numpy(dtype=float)
+    ref_mask = np.isfinite(ref) & np.isfinite(med_y) & (ref > 0.0) & (med_y > 0.0)
+    if ref_mask.any():
+        scale = float(np.median(med_y[ref_mask]) / np.median(ref[ref_mask]))
+        d2 = float(np.median(grouped["N"] / (grouped["scaled_budget"] * grouped["n"])))
+        for i, n in enumerate(n_values):
+            sub = grouped[grouped["n"] == n]
+            x_grid = np.geomspace(sub["scaled_budget"].min(), sub["scaled_budget"].max(), 80)
+            label = r"reference $\propto \log(N)/\sqrt{x}$" if i == 0 else None
+            axes[0].plot(
+                x_grid,
+                scale * np.log(x_grid * d2 * n) / np.sqrt(x_grid),
+                color="#222222",
+                linestyle=":",
+                linewidth=1.0,
+                alpha=0.45,
+                label=label,
+            )
+        xlog_grid = np.geomspace(grouped["scaled_budget_log"].min(), grouped["scaled_budget_log"].max(), 120)
+        axes[1].plot(
+            xlog_grid,
+            scale / np.sqrt(xlog_grid),
+            color="#222222",
+            linestyle=":",
+            linewidth=1.2,
+            alpha=0.8,
+            label=r"same reference $\propto 1/\sqrt{x_{\log}}$",
+        )
+
+    filter_bits = []
+    if exclude_N_equals_n:
+        filter_bits.append(r"$N > n$")
+    elif min_N_over_n > 1.0:
+        filter_bits.append(rf"$N/n \geq {min_N_over_n:g}$")
+    if min_seeds > 1:
+        filter_bits.append(f"at least {min_seeds} seeds per group")
+    filter_text = "; ".join(filter_bits)
+    suffix = f" ({filter_text})" if filter_text else ""
+    axes[0].set_ylabel(r"median $\Delta_{N,u} = \mathrm{KL}(G_u^*\,\|\,\widehat Q_{N,u})$ (nats)")
+    axes[1].legend(fontsize=8, loc="best")
+    fig.suptitle(
+        "GNK Gaussian-NPE native u-space error vs scaled simulation budget" + suffix,
+        y=1.02,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    return grouped
+
+
 def plot_coord_offset(df: pd.DataFrame, out_path: Path) -> None:
     oracle = df.drop_duplicates(["n", "seed"])
     grouped = median_q25_q75(oracle.groupby("n"), "coord_offset").reset_index()
@@ -172,6 +282,7 @@ def main() -> None:
         "seed",
         "scaled_budget",
         "coord_offset",
+        "Delta_u_total",
         "Delta_u_mean",
         "Delta_u_cov",
     }
@@ -182,9 +293,17 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     delta_path = args.output_dir / f"{args.output_prefix}_delta_u_mean_cov.pdf"
     coord_path = args.output_dir / f"{args.output_prefix}_coord_offset_vs_n.pdf"
+    scaled_path = args.output_dir / f"{args.output_prefix}_delta_u_total_scaled_budget_log_corrected.pdf"
     plotted_df = plot_delta_components(
         df,
         delta_path,
+        min_N_over_n=args.min_N_over_n,
+        exclude_N_equals_n=args.exclude_N_equals_n,
+        min_seeds=args.min_seeds,
+    )
+    scaled_grouped = plot_scaled_budget(
+        plotted_df,
+        scaled_path,
         min_N_over_n=args.min_N_over_n,
         exclude_N_equals_n=args.exclude_N_equals_n,
         min_seeds=args.min_seeds,
@@ -196,16 +315,21 @@ def main() -> None:
         "commit": git_commit(),
         "script": rel(Path(__file__)),
         "input_csv": rel(args.input_csv),
-        "outputs": [rel(delta_path), rel(coord_path)],
+        "outputs": [rel(delta_path), rel(coord_path), rel(scaled_path)],
         "delta_plot_min_N_over_n": args.min_N_over_n,
         "delta_plot_exclude_N_equals_n": bool(args.exclude_N_equals_n),
         "delta_plot_min_seeds": int(args.min_seeds),
         "delta_plot_groups": int(plotted_df[["n", "N"]].drop_duplicates().shape[0]),
         "delta_plot_rows": int(len(plotted_df)),
+        "scaled_budget_plot_groups": int(scaled_grouped[["n", "N"]].drop_duplicates().shape[0]),
+        "scaled_budget_original": "x = N/(d_total^2 n)",
+        "scaled_budget_log_corrected": "x_log = N/(d_total^2 n log(N)^2), using natural logs",
+        "scaled_budget_reference_overlay": "proportional to log(N)/sqrt(N/(d_total^2 n)); same quantity is proportional to 1/sqrt(x_log)",
         "input_rows": int(len(df)),
         "notes": [
             "Delta components are native u-space Gaussian-NPE approximation error.",
             "Coordinate offset is K_u^* - K_theta^*, explicitly u-space minus theta-space.",
+            "The log-corrected panel keeps the BvM corollary logarithmic factor in the finite-N visualisation; it is not a new rate.",
             "Axis labels include theta-space/u-space where relevant.",
         ],
     }
@@ -213,6 +337,7 @@ def main() -> None:
     meta_path.write_text(json.dumps(metadata, indent=2, sort_keys=True))
     print(f"Wrote {delta_path}")
     print(f"Wrote {coord_path}")
+    print(f"Wrote {scaled_path}")
     print(f"Wrote {meta_path}")
 
 
