@@ -2,6 +2,7 @@ task: gnk-hpc-calibration
 run_id: gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
 created_at_utc: '2026-04-25T06:50:35Z'
 git_commit: a428ac2
+calibration_code_commit: 464b3d8
 git_dirty: true
 branch: exp-hpc-calibration
 method: Gaussian-NPE
@@ -33,6 +34,23 @@ seed_selection:
   source_rows: 101
   median_Delta_u_total: 2.634332000648568
   selected_seed_Delta_u_total: 2.634332000648568
+  selected_seed_abs_diff_from_median: 0.0
+  nearest_seeds_by_abs_diff:
+  - seed: 88
+    Delta_u_total: 2.634332000648568
+    abs_diff: 0.0
+  - seed: 91
+    Delta_u_total: 2.6311406933248006
+    abs_diff: 0.003191307323767374
+  - seed: 66
+    Delta_u_total: 2.6432512149197077
+    abs_diff: 0.008919214271139627
+  - seed: 2
+    Delta_u_total: 2.670735461532224
+    abs_diff: 0.03640346088365589
+  - seed: 99
+    Delta_u_total: 2.5931743813217034
+    abs_diff: 0.04115761932686454
   fallback_used: false
 selection_rationale: Selected x=50 because it is the preferred calibration point,
   the resolved N=3,025,000 is below the existing cached n=5000, N=25,000,000 scale,

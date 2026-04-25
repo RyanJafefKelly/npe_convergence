@@ -102,11 +102,29 @@ runs:
     selected_calibration_x: 50
     resolved_N: 3025000
     seed: 88
+    calibration_code_commit: 464b3d8
     seed_selection:
       rule: "Choose the seed whose cached Delta_u_total is closest to the median among finite complete-seed rows with n=500 and N=250000 in notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv."
       source_rows: 101
       median_Delta_u_total: 2.634332000648568
       selected_seed_Delta_u_total: 2.634332000648568
+      selected_seed_abs_diff_from_median: 0.0
+      nearest_seeds_by_abs_diff:
+        - seed: 88
+          Delta_u_total: 2.634332000648568
+          abs_diff: 0.0
+        - seed: 91
+          Delta_u_total: 2.6311406933248006
+          abs_diff: 0.003191307323767374
+        - seed: 66
+          Delta_u_total: 2.6432512149197077
+          abs_diff: 0.008919214271139627
+        - seed: 2
+          Delta_u_total: 2.670735461532224
+          abs_diff: 0.03640346088365589
+        - seed: 99
+          Delta_u_total: 2.5931743813217034
+          abs_diff: 0.04115761932686454
       fallback_used: false
     dry_run_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
     prepare_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --write-config --selected-x 50 --created-at 2026-04-25T06:50:35Z --run-id gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
