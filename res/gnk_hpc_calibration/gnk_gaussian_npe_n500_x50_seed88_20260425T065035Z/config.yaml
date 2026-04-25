@@ -2,7 +2,7 @@ task: gnk-hpc-calibration
 run_id: gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z
 created_at_utc: '2026-04-25T06:50:35Z'
 git_commit: a428ac2
-calibration_code_commit: 464b3d8
+calibration_code_commit: bcd5cfd
 git_dirty: true
 branch: exp-hpc-calibration
 method: Gaussian-NPE
