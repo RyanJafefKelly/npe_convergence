@@ -6,7 +6,7 @@ Support the theory-first JMLR paper by clarifying finite-N NPE approximation und
 
 ## Current priority order
 
-1. n=500 BvM oracle gate.
+1. n=500 BvM oracle gate. Completed: median K_theta^*(n=500) = 0.099533 nats over 101 seeds; acceptable by the median-based <= 0.1 rule, but borderline.
 2. Coordinate reconciliation: theta oracle, u oracle, coordinate offset.
 3. Gaussian-NPE u-space KL decomposition.
 4. Log-corrected scaled-budget plots.
@@ -49,7 +49,7 @@ Interpret Delta_N,u as native-coordinate Gaussian-NPE error, not pure BvM target
 
 ### High-budget HPC
 
-- Select n only after the n=500 oracle gate is recorded in `DECISIONS.md`.
+- n=500 passed the median-based oracle gate and is selected for calibration/main high-budget planning, with the caveat that acceptance is borderline because the IQR is [0.077337, 0.135198].
 - Run one calibration job before submitting any full array.
 - Prepare dry-run tables before submission.
 - Do not submit the full array until the dry-run table has been reviewed.

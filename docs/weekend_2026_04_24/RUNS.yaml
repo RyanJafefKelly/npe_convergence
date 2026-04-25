@@ -1,13 +1,17 @@
 runs:
   - id: gnk-n500-oracle-gate
-    status: pending
+    status: completed
     branch: exp/oracle-gate-n500
-    command: null
+    command: "python scripts/compute_gnk_n500_oracle_gate.py --n-obs 500 --seeds 0,100 --cache-dir res/gnk --output-dir notebooks/plots --output-prefix gnk_n500_oracle_gate_20260425"
     inputs:
-      cache: null
-    outputs: []
-    decision_needed: "Use n=500 or n=1000 for high-budget HPC?"
-    notes: "Compute theta-space Gaussian oracle KL K_theta^*(n=500) from existing cached NUTS posterior samples. Do not retrain NPE or overwrite caches."
+      cache: "res/gnk/nuts_cache_v2_n_obs_500_seed_{0..100}.pkl"
+      seeds: 101
+      posterior_samples_per_seed: 10000
+    outputs:
+      - notebooks/plots/gnk_n500_oracle_gate_20260425_per_seed.csv
+      - notebooks/plots/gnk_n500_oracle_gate_20260425_summary.json
+    decision_needed: null
+    notes: "Theta-space Gaussian oracle KL K_theta^*(n=500) median=0.099533 nats, IQR=[0.077337, 0.135198] over 101 cached NUTS posterior seeds. By the <=0.1 nats rule, n=500 is acceptable for the high-budget curve, but it is close to the threshold."
 
   - id: gnk-coordinate-u-kl-decomp
     status: pending
@@ -30,11 +34,10 @@ runs:
     notes: "Preserve x = N/(d^2 n) plot and add x_log = N/(d^2 n log(N)^2) using natural logs unless current scripts specify otherwise."
 
   - id: gnk-hpc-calibration
-    status: blocked
-    blocked_by:
-      - gnk-n500-oracle-gate
+    status: pending
     branch: exp/hpc-calibration
     command: null
+    selected_n: 500
     n_candidate:
       - 500
       - 1000
@@ -46,7 +49,7 @@ runs:
       - 500
     outputs: []
     decision_needed: "After calibration, decide whether the full high-budget array is feasible and which x grid to submit."
-    notes: "Start with one calibration job only. Full array submission requires explicit review of a dry-run table."
+    notes: "n=500 passed the median-based oracle gate but is borderline. Start with one n=500 calibration job only. Full array submission remains blocked until timing/output metadata and a dry-run table are explicitly reviewed."
 
   - id: gnk-model-control-pilot
     status: blocked
