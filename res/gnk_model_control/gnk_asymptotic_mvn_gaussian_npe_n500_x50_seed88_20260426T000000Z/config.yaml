@@ -1,0 +1,169 @@
+task: gnk-model-control-pilot
+run_id: gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
+created_at_utc: '2026-04-26T00:00:00Z'
+git_commit: 3ace1d9
+model_control_code_commit: 3ace1d9
+git_dirty: true
+branch: exp-gnk-model-control
+method: Gaussian-NPE
+simulator: gnk_asymptotic_mvn
+empirical_simulator_name: gnk_empirical_quantile
+n: 500
+d_s: 7
+d_theta: 4
+d: 11
+x: 50
+N: 3025000
+observed_seed: 88
+simulation_seed: 88
+training_seed: 88
+posterior_sampling_seed: 88
+prior:
+  implementation: numpyro.distributions.Uniform(1e-6, 10-1e-6)
+  scientific_prior: independent Uniform(0, 10) for A, B, g, k
+  theta_names:
+  - A
+  - B
+  - g
+  - k
+observed_summary:
+  source: regenerated from true theta=(3,1,2,0.5), observed seed 88, and npe_convergence.examples.gnk.ss_octile,
+    matching the NUTS cache convention
+  dimension: 7
+  coordinate_convention: octiles at probabilities 1/(d_s+1), ..., d_s/(d_s+1)
+nuts_reference_cache_path: res/gnk/nuts_cache_v2_n_obs_500_seed_88.pkl
+training_pair_generator:
+  theta_sampler: prior
+  summary_simulator: gnk_asymptotic_mvn
+  mvn_mean_function: npe_convergence.examples.gnk.gnk at normal quantiles
+  mvn_covariance_function: npe_convergence.examples.gnk.compute_covariance_matrix
+  base_jitter: 1.0e-06
+  additional_jitter_grid:
+  - 1.0e-08
+  - 1.0e-07
+  - 1.0e-06
+  - 1.0e-05
+  - 0.0001
+  - 0.001
+output_dir: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
+scheduler_resource_request:
+  scheduler: PBS
+  job_type: single_non_array
+  walltime: '47:00:00'
+  mem: 64GB
+  ncpus: 4
+  ngpus: 0
+train_config:
+  lr: 0.0005
+  batch_size: 256
+  max_epochs: 2000
+  patience: 200
+  val_frac: 0.1
+  hidden_dims:
+  - 128
+  - 128
+expected_outputs:
+  output_dir: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
+  config: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml
+  validation_curve: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.csv
+  validation_curve_plot: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.pdf
+  predicted_u_mean_cov: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz
+  samples_10k: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples_10k.npz
+  posterior_samples_pkl: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples.pkl
+  metrics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/metrics.json
+  timing_metadata: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/timing_metadata.json
+  simulator_diagnostics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/simulator_diagnostics.json
+  evaluation: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/u_space_decomposition.json
+  stdout_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log
+  stderr_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log
+dry_run_rows:
+- n: 500
+  x: 25
+  N: 1512500
+  seed: 88
+  method: Gaussian-NPE
+  simulator: gnk_asymptotic_mvn
+  selected: false
+  run_id: gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z
+  paths:
+    output_dir: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z
+    config: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/config.yaml
+    validation_curve: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/validation_curve.csv
+    validation_curve_plot: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/validation_curve.pdf
+    predicted_u_mean_cov: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz
+    samples_10k: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/posterior_samples_10k.npz
+    posterior_samples_pkl: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/posterior_samples.pkl
+    metrics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/metrics.json
+    timing_metadata: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/timing_metadata.json
+    simulator_diagnostics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/simulator_diagnostics.json
+    evaluation: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/u_space_decomposition.json
+    stdout_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/logs/stdout.log
+    stderr_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z/logs/stderr.log
+  exists:
+    output_dir: false
+    config: false
+    validation_curve: false
+    validation_curve_plot: false
+    predicted_u_mean_cov: false
+    samples_10k: false
+    posterior_samples_pkl: false
+    metrics: false
+    timing_metadata: false
+    simulator_diagnostics: false
+    evaluation: false
+    stdout_log: false
+    stderr_log: false
+- n: 500
+  x: 50
+  N: 3025000
+  seed: 88
+  method: Gaussian-NPE
+  simulator: gnk_asymptotic_mvn
+  selected: true
+  run_id: gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
+  paths:
+    output_dir: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
+    config: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml
+    validation_curve: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.csv
+    validation_curve_plot: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.pdf
+    predicted_u_mean_cov: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz
+    samples_10k: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples_10k.npz
+    posterior_samples_pkl: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples.pkl
+    metrics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/metrics.json
+    timing_metadata: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/timing_metadata.json
+    simulator_diagnostics: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/simulator_diagnostics.json
+    evaluation: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/u_space_decomposition.json
+    stdout_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log
+    stderr_log: res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log
+  exists:
+    output_dir: true
+    config: true
+    validation_curve: false
+    validation_curve_plot: false
+    predicted_u_mean_cov: false
+    samples_10k: false
+    posterior_samples_pkl: false
+    metrics: false
+    timing_metadata: false
+    simulator_diagnostics: false
+    evaluation: false
+    stdout_log: false
+    stderr_log: false
+post_run_evaluation_command: python npe_convergence/scripts/run_gnk_model_control_pilot.py
+  --evaluate --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml
+qsub_command: qsub npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh
+pbs_script: npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh
+manual_hpc_command: mkdir -p res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs
+  && python npe_convergence/scripts/run_gnk_model_control_pilot.py --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml
+  > res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log
+  2> res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log
+manual_hpc_command_note: Direct python command must be run inside an allocated compute
+  job; do not run this 3M-simulation training job on an HPC login node.
+run_command: python npe_convergence/scripts/run_gnk_model_control_pilot.py --config
+  res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml
+full_array_submitted: false
+selected_output_collisions: []
+selected_output_collisions_at_prepare_time: false
+selection_rationale: Selected x=50 because it matches the completed empirical-GNK
+  calibration at n=500, N=3,025,000, seed=88. x=25 is retained only as a fallback
+  candidate.

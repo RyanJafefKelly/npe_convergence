@@ -201,16 +201,85 @@ runs:
     notes: "Completed exactly one non-array n=500 Gaussian-NPE calibration job on Aquarius as PBS job 20344975.aqua after the HPC dry-run showed no selected-runtime-output collisions beyond the existing config. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 was plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. Observed wall time was about 6.5 hours with about 1.7GB peak RSS; training dominated runtime. No full array was submitted. Full high-budget array remains blocked pending explicit review/decision using this calibration result."
 
   - id: gnk-model-control-pilot
-    status: blocked
-    blocked_by:
-      - gnk-hpc-calibration
+    status: prepared
     branch: exp-gnk-model-control
-    command: null
+    commit_hash: 3ace1d9
+    model_control_code_commit: 3ace1d9
+    git_dirty_at_prepare_time: true
+    simulator_flag: gnk_asymptotic_mvn
+    empirical_simulator_name: gnk_empirical_quantile
+    method: Gaussian-NPE
+    n: 500
+    d_s: 7
+    d_theta: 4
+    d: 11
+    x_grid_considered:
+      - 25
+      - 50
+    selected_x: 50
+    resolved_N: 3025000
+    seed: 88
+    dry_run_command: "python npe_convergence/scripts/run_gnk_model_control_pilot.py --dry-run --write-config --allow-existing-config --selected-x 50 --created-at 2026-04-26T00:00:00Z --run-id gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z"
+    smoke_test_command: "python npe_convergence/scripts/run_gnk_model_control_pilot.py --smoke-test --smoke-batch-size 8"
+    qsub_command: "qsub npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh"
+    pbs_script: "npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh"
+    submit_local_command: "mkdir -p res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs && python npe_convergence/scripts/run_gnk_model_control_pilot.py --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml > res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log 2> res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log"
+    submit_local_command_note: "Direct python command must be run inside an allocated compute job; do not run this 3M-simulation training job on an HPC login node."
+    post_run_evaluation_command: "python npe_convergence/scripts/run_gnk_model_control_pilot.py --evaluate --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml"
+    scheduler_job_id: null
+    output_dir: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z"
     inputs:
       simulator: gnk_asymptotic_mvn
-    outputs: []
+      prior: "independent Uniform(0, 10), implemented for simulation as Uniform(1e-6, 10-1e-6)"
+      observed_summary_source: "regenerated from true theta=(3,1,2,0.5), observed seed 88, and npe_convergence.examples.gnk.ss_octile"
+      nuts_reference_cache_path: "res/gnk/nuts_cache_v2_n_obs_500_seed_88.pkl"
+      mvn_mean_function: "npe_convergence.examples.gnk.gnk at normal quantiles"
+      mvn_covariance_function: "npe_convergence.examples.gnk.compute_covariance_matrix"
+    dry_run_rows:
+      - n: 500
+        x: 25
+        N: 1512500
+        seed: 88
+        selected: false
+        output_dir: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x25_seed88_20260426T000000Z"
+        selected_output_collisions_at_prepare_time: false
+      - n: 500
+        x: 50
+        N: 3025000
+        seed: 88
+        selected: true
+        output_dir: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z"
+        config_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml"
+        validation_curve_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.csv"
+        predicted_u_mean_cov_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz"
+        sample_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples_10k.npz"
+        timing_metadata_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/timing_metadata.json"
+        simulator_diagnostics_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/simulator_diagnostics.json"
+        evaluation_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/u_space_decomposition.json"
+        stdout_log_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log"
+        stderr_log_path: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log"
+        selected_output_collisions_at_prepare_time: false
+    selected_output_collisions_at_prepare_time: false
+    selected_output_collisions: []
+    expected_outputs:
+      config: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml"
+      validation_curve: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.csv"
+      validation_curve_plot: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.pdf"
+      predicted_u_mean_cov: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz"
+      samples_10k: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples_10k.npz"
+      posterior_samples_pkl: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples.pkl"
+      metrics: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/metrics.json"
+      timing_metadata: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/timing_metadata.json"
+      simulator_diagnostics: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/simulator_diagnostics.json"
+      u_space_decomposition: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/u_space_decomposition.json"
+      stdout_log: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log"
+      stderr_log: "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log"
+    outputs:
+      - "npe_convergence/scripts/run_gnk_model_control_pilot.py"
+      - "npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh"
+      - "res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml"
     decision_needed: "Does residual persist when NPE training simulator matches the NUTS reference likelihood?"
-    notes: "Pilot only; do not make gnk_model the default simulator and do not overwrite empirical-GNK caches."
+    notes: "Prepared only in the local non-HPC environment; no job was submitted, no full array was submitted, and empirical-GNK caches were not overwritten. Dry-run selected x=50 to match the completed empirical-GNK calibration at n=500, N=3,025,000, seed=88. Smoke check generated an 8x7 asymptotic-MVN summary batch with finite values, zero PD failures, and zero additional-jitter uses. Interpretation remains pending until the pilot run completes and is evaluated through u-space decomposition."
 
   - id: gnk-hexadecile-aggregation
     status: pending
