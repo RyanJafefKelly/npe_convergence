@@ -19,6 +19,7 @@ Use `_brief_for_chatgpt_round4.md` as the compact high-level project context. Do
 - Start by checking `git status`.
 - Treat paths listed in `WORKTREE_BASELINE.md` as pre-existing local state unless your task explicitly touches them.
 - Use a task branch or worktree unless the user says otherwise.
+- Use flat branch names such as `exp-oracle-gate-n500`. Avoid nested `exp/...` names in this repo because Git refs may conflict with existing flat refs.
 - Do not modify `paper.tex` unless explicitly assigned.
 - Do not overwrite caches.
 - Do not launch large HPC arrays before the n=500 oracle gate and one calibration job.

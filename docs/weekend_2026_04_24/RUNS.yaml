@@ -1,7 +1,7 @@
 runs:
   - id: gnk-n500-oracle-gate
     status: completed
-    branch: exp/oracle-gate-n500
+    branch: exp-oracle-gate-n500
     command: "python scripts/compute_gnk_n500_oracle_gate.py --n-obs 500 --seeds 0,100 --cache-dir res/gnk --output-dir notebooks/plots --output-prefix gnk_n500_oracle_gate_20260425"
     inputs:
       cache: "res/gnk/nuts_cache_v2_n_obs_500_seed_{0..100}.pkl"
@@ -15,7 +15,7 @@ runs:
 
   - id: gnk-coordinate-u-kl-decomp
     status: pending
-    branch: exp/u-space-kl-decomp
+    branch: exp-u-space-kl-decomp
     command: null
     inputs:
       cache: null
@@ -25,7 +25,7 @@ runs:
 
   - id: gnk-log-corrected-scaling
     status: pending
-    branch: exp/log-corrected-scaling
+    branch: exp-log-corrected-scaling
     command: null
     inputs:
       aggregate_table: null
@@ -35,7 +35,7 @@ runs:
 
   - id: gnk-hpc-calibration
     status: pending
-    branch: exp/hpc-calibration
+    branch: exp-hpc-calibration
     command: null
     selected_n: 500
     n_candidate:
@@ -55,7 +55,7 @@ runs:
     status: blocked
     blocked_by:
       - gnk-hpc-calibration
-    branch: exp/gnk-model-control
+    branch: exp-gnk-model-control
     command: null
     inputs:
       simulator: gnk_asymptotic_mvn
@@ -65,7 +65,7 @@ runs:
 
   - id: gnk-hexadecile-aggregation
     status: pending
-    branch: exp/hexadecile-aggregation
+    branch: exp-hexadecile-aggregation
     command: null
     inputs:
       cache: res/gnk_hexadeciles/
@@ -75,7 +75,7 @@ runs:
 
   - id: ma2-b0-compatibility
     status: pending
-    branch: exp/ma2-compatibility
+    branch: exp-ma2-compatibility
     command: null
     inputs:
       cache: null

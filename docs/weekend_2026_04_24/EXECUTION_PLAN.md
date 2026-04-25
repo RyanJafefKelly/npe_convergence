@@ -60,15 +60,17 @@ Before starting any task, read `docs/weekend_2026_04_24/AGENT_BRIEF.md`. It link
 
 Use one branch or worktree per task. Do not let two agents edit the same plotting script at the same time.
 
+Use flat task branch names in this repo. Avoid nested names like `exp/<task-name>` because Git refs can conflict when a flat `exp` ref exists or has existed.
+
 Suggested branches:
 
-- `exp/oracle-gate-n500`
-- `exp/u-space-kl-decomp`
-- `exp/log-corrected-scaling`
-- `exp/hpc-calibration`
-- `exp/gnk-model-control`
-- `exp/hexadecile-aggregation`
-- `exp/ma2-compatibility`
+- `exp-oracle-gate-n500`
+- `exp-u-space-kl-decomp`
+- `exp-log-corrected-scaling`
+- `exp-hpc-calibration`
+- `exp-gnk-model-control`
+- `exp-hexadecile-aggregation`
+- `exp-ma2-compatibility`
 
 Suggested start commands:
 
@@ -76,13 +78,13 @@ Suggested start commands:
 git status
 git checkout main
 git pull
-git checkout -b exp/<task-name>
+git checkout -b exp-<task-name>
 ```
 
 Or use worktrees:
 
 ```bash
-git worktree add ../npe-exp-<task-name> -b exp/<task-name>
+git worktree add ../npe-exp-<task-name> -b exp-<task-name>
 ```
 
 Suggested close-out commands:
