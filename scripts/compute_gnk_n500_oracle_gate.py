@@ -164,7 +164,7 @@ def main() -> None:
     }
 
     with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     json_path.write_text(json.dumps(summary, indent=2) + "\n")
