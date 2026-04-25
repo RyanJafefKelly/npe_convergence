@@ -167,7 +167,8 @@ path.
 - Empirical simulator name recorded for distinction: `gnk_empirical_quantile`.
 - Method: Gaussian-NPE only.
 - Branch: `exp-gnk-model-control`.
-- Prepared from commit hash: `3ace1d9`; dirty state true because the simulator-control script, generated config, PBS wrapper, and documentation updates were uncommitted at initial prepare time.
+- Simulator-control code commit: `0d195bd`.
+- Latest regenerated config records git hash `0d195bd`; dirty state remains true because unrelated pre-existing local files are still dirty/untracked in the worktree.
 - n: 500.
 - d_s: 7; d_theta: 4; d: 11.
 - x grid considered: `{25, 50}`.

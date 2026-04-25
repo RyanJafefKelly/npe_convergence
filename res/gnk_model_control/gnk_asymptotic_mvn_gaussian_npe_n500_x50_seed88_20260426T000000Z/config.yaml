@@ -1,8 +1,8 @@
 task: gnk-model-control-pilot
 run_id: gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z
 created_at_utc: '2026-04-26T00:00:00Z'
-git_commit: 3ace1d9
-model_control_code_commit: 3ace1d9
+git_commit: 0d195bd
+model_control_code_commit: 0d195bd
 git_dirty: true
 branch: exp-gnk-model-control
 method: Gaussian-NPE

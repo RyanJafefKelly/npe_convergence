@@ -203,8 +203,8 @@ runs:
   - id: gnk-model-control-pilot
     status: prepared
     branch: exp-gnk-model-control
-    commit_hash: 3ace1d9
-    model_control_code_commit: 3ace1d9
+    commit_hash: 0d195bd
+    model_control_code_commit: 0d195bd
     git_dirty_at_prepare_time: true
     simulator_flag: gnk_asymptotic_mvn
     empirical_simulator_name: gnk_empirical_quantile
