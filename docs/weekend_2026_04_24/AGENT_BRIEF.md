@@ -22,7 +22,7 @@ Use `_brief_for_chatgpt_round4.md` as the compact high-level project context. Do
 - Use flat branch names such as `exp-oracle-gate-n500`. Avoid nested `exp/...` names in this repo because Git refs may conflict with existing flat refs.
 - Do not modify `paper.tex` unless explicitly assigned.
 - Do not overwrite caches.
-- Do not launch large HPC arrays before the n=500 oracle gate and one calibration job.
+- Do not launch large HPC arrays before the n=500 oracle gate, one calibration job, and post-calibration u-space diagnostic review.
 - Keep generated outputs in clearly named paths and record them in `RUNS.yaml` and `RESULTS.md`.
 - Use exact cache paths in reports whenever possible.
 
@@ -33,6 +33,7 @@ Use `_brief_for_chatgpt_round4.md` as the compact high-level project context. Do
 - u-space decomposition is native-coordinate Gaussian-NPE error, not pure BvM residual.
 - MA2-b0 is compatibility failure only, not part of BvM-rate evidence.
 - Flow-NPE vs Gaussian-NPE is not a horse race here. Under BvM, tracking is evidence for family sufficiency.
+- The completed GNK HPC calibration is operational feasibility evidence only until evaluated through the reviewed u-space decomposition.
 - The empirical point is to support and sharpen the theory-first JMLR paper, not to introduce unrelated methodology.
 
 ## Standard task close-out

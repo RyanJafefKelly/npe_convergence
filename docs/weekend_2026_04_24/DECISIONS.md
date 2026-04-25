@@ -48,3 +48,14 @@ Implication: Priority 4 is complete. The plot is a diagnostic re-expression of t
 Evidence:
 - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_total_scaled_budget_log_corrected.pdf`
 - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_plot_metadata.json`
+
+## 2026-04-26: GNK HPC calibration completed
+
+Decision: Treat individual n=500, x=50 Gaussian-NPE HPC jobs as operationally feasible under the tested PBS request.
+Reason: The seed-88 calibration job completed with exit status 0 in about 6.5h wall time, used about 1.7GB RSS, produced required outputs, and had empty stderr.
+Implication: A staged high-budget run may be planned, but the full broad array remains blocked pending review of calibration diagnostics, queue cost, and the proposed x/seed grid.
+Evidence:
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`

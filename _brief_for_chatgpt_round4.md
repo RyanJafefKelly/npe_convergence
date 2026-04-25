@@ -88,13 +88,14 @@ Priority order:
 2. Coordinate reconciliation: theta oracle, u oracle, coordinate offset.
 3. Gaussian-NPE u-space KL decomposition.
 4. Log-corrected scaled-budget plots.
-5. HPC calibration for high-budget GNK curve.
-6. gnk_model simulator-control pilot.
-7. Hexadecile aggregation.
-8. MA2-b0 compatibility sanity check.
-9. Stereological only if nearly automatic.
+5. HPC calibration for high-budget GNK curve. Completed: one non-array n=500, x=50, N=3,025,000 Gaussian-NPE calibration job completed in about 6.5h wall time with about 1.7GB RSS.
+6. Post-calibration high-budget diagnostic: evaluate the calibration output with the reviewed u-space decomposition before treating it as a theorem-facing high-budget point or approving any broad array.
+7. gnk_model simulator-control pilot.
+8. Hexadecile aggregation.
+9. MA2-b0 compatibility sanity check.
+10. Stereological only if nearly automatic.
 
-The high-budget HPC curve is blocked until the n=500 oracle gate is checked and one calibration job has run.
+The broad high-budget HPC curve remains blocked until the completed calibration output is evaluated with the reviewed u-space decomposition and a staged x/seed grid dry-run is reviewed.
 
 ## How to interpret outcomes
 
@@ -130,4 +131,3 @@ Agents are implementers and reviewers, not owners of the scientific narrative. T
 Use GPT-5.5 Pro or a similarly strong reasoning pass for novel mathematical interpretation, delicate KL identities, or theorem-facing claims. Routine implementation from a clear plan can be done by coding agents.
 
 Never modify `paper.tex` unless explicitly assigned. Do not overwrite caches. Every generated figure or table should record command/script, commit hash, cache/input paths, output paths, and timestamp.
-

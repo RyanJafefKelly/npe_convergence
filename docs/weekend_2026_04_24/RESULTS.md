@@ -148,6 +148,7 @@ explicit review and decision using this calibration result.
 - Posterior output shape: `posterior_samples_10k.npz` contains `theta`, `u`, and `eta` arrays of shape `(10000, 4)`.
 - Predicted u-space Gaussian output shape: `gaussian_npe_u_posterior.npz` contains `mu_u` shape `(4,)` and `cov_u` shape `(4,4)`.
 - Diagnostics: `kl_theta_knn_2000=2.3282495190889403`, `mmd_theta_2000=0.21408498287200928`; these are calibration diagnostics, not a full-array result.
+- Paper-facing status: this calibration output still needs evaluation through the reviewed u-space decomposition before it should be plotted or interpreted as a comparable high-budget `Delta_N,u` point.
 - Recommendation for full array: operationally, x=50 appears feasible for individual jobs under the tested 47h/64GB PBS request because this job completed in about 6.5h and used about 1.7GB RSS. A full high-budget array should still wait for explicit review of queue cost, desired x grid, and whether to run x=25/x=50 only before larger x values.
 - Note: no full high-budget array was submitted.
 

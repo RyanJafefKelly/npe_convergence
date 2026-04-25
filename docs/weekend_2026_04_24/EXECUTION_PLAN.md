@@ -10,17 +10,18 @@ Support the theory-first JMLR paper by clarifying finite-N NPE approximation und
 2. Coordinate reconciliation: theta oracle, u oracle, coordinate offset. Completed on `exp-u-space-kl-decomp`; scientific-code review issues addressed.
 3. Gaussian-NPE u-space KL decomposition. Completed on `exp-u-space-kl-decomp`; scientific-code review issues addressed.
 4. Log-corrected scaled-budget plots. Completed on `exp-log-corrected-scaling`; uses `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`, excludes `N=n`, and requires complete 101-seed groups for the main theorem-facing scaled-budget panels.
-5. HPC calibration for high-budget GNK curve.
-6. gnk_model simulator-control pilot.
-7. Hexadecile aggregation.
-8. MA2-b0 compatibility figure sanity check.
-9. Stereological only if nearly automatic.
+5. HPC calibration for high-budget GNK curve. Completed on `exp-hpc-calibration`: one non-array n=500, x=50, N=3,025,000 Gaussian-NPE calibration job completed with exit status 0 in about 6.5h wall time and about 1.7GB RSS.
+6. Post-calibration high-budget diagnostic: evaluate the calibration output with the reviewed u-space decomposition before treating it as a theorem-facing high-budget point or approving any broad array.
+7. gnk_model simulator-control pilot.
+8. Hexadecile aggregation.
+9. MA2-b0 compatibility figure sanity check.
+10. Stereological only if nearly automatic.
 
 ## Hard constraints
 
 - Do not modify `paper.tex` unless explicitly assigned.
 - Do not overwrite caches.
-- Do not launch large HPC arrays before the n=500 oracle gate and one calibration job.
+- Do not launch large HPC arrays before the n=500 oracle gate, one calibration job, and post-calibration u-space diagnostic review.
 - Use u-space for exact Gaussian-NPE analytic decomposition.
 - Use theta-space oracle KL for the BvM premise.
 - Keep MA2-b0 out of the BvM-rate narrative.
@@ -50,9 +51,10 @@ Interpret Delta_N,u as native-coordinate Gaussian-NPE error, not pure BvM target
 ### High-budget HPC
 
 - n=500 passed the median-based oracle gate and is selected for calibration/main high-budget planning, with the caveat that acceptance is borderline because the IQR is [0.077337, 0.135198].
-- Run one calibration job before submitting any full array.
-- Prepare dry-run tables before submission.
-- Do not submit the full array until the dry-run table has been reviewed.
+- One calibration job has completed: n=500, x=50, N=3,025,000, seed 88, PBS job `20344975.aqua`, exit status 0, about 6.5h wall time, about 1.7GB RSS.
+- Treat individual x=50 jobs as operationally feasible under the tested 47h/64GB PBS request.
+- Before any broad full array, evaluate the calibration output with the reviewed u-space decomposition and review a staged x/seed grid dry-run.
+- Do not submit the full broad array until the post-calibration diagnostic and proposed dry-run table have been reviewed.
 
 ## Branch and worktree discipline
 
