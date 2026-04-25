@@ -12,7 +12,7 @@ Support the theory-first JMLR paper by clarifying finite-N NPE approximation und
 4. Log-corrected scaled-budget plots. Completed on `exp-log-corrected-scaling`; uses `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`, excludes `N=n`, and requires complete 101-seed groups for the main theorem-facing scaled-budget panels.
 5. HPC calibration for high-budget GNK curve. Completed on `exp-hpc-calibration`: one non-array n=500, x=50, N=3,025,000 Gaussian-NPE calibration job completed with exit status 0 in about 6.5h wall time and about 1.7GB RSS.
 6. Post-calibration high-budget diagnostic: evaluate the calibration output with the reviewed u-space decomposition before treating it as a theorem-facing high-budget point or approving any broad array.
-7. gnk_model simulator-control pilot. Prepared on `exp-gnk-model-control`; launch pending PBS-wrapper/code-hash cleanup and one non-array submission.
+7. gnk_model simulator-control pilot. Prepared on `exp-gnk-model-control`; awaiting Ryan's manual HPC preflight and exactly one non-array PBS submission.
 8. Hexadecile aggregation.
 9. MA2-b0 compatibility figure sanity check.
 10. Stereological only if nearly automatic.

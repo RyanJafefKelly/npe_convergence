@@ -168,7 +168,8 @@ path.
 - Method: Gaussian-NPE only.
 - Branch: `exp-gnk-model-control`.
 - Simulator-control code commit: `0d195bd`.
-- Latest regenerated config records git hash `0d195bd`; dirty state remains true because unrelated pre-existing local files are still dirty/untracked in the worktree.
+- Metadata/config commit: `615702a`.
+- Committed config records git hash `0d195bd` and `model_control_code_commit: 0d195bd`; dirty state was true at prepare time because unrelated pre-existing local files were dirty/untracked in the worktree.
 - n: 500.
 - d_s: 7; d_theta: 4; d: 11.
 - x grid considered: `{25, 50}`.
@@ -186,6 +187,7 @@ path.
 - PBS submit command: `qsub npe_convergence/scripts/pbs_jobs/gnk_model_control_n500_x50_seed88.sh`.
 - Manual HPC/local launch command, only inside an allocated compute job: `mkdir -p res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs && python npe_convergence/scripts/run_gnk_model_control_pilot.py --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml > res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stdout.log 2> res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/logs/stderr.log`.
 - Post-run evaluation command: `python npe_convergence/scripts/run_gnk_model_control_pilot.py --evaluate --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml`.
+- HPC preflight commands before `qsub`: `git status --short --branch`; `git log --oneline -n 5`; `python npe_convergence/scripts/run_gnk_model_control_pilot.py --dry-run --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/config.yaml`; `test -f res/gnk/nuts_cache_v2_n_obs_500_seed_88.pkl`; `find res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z -maxdepth 2 -type f | sort`.
 - Expected validation curve path: `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/validation_curve.csv`.
 - Expected predicted Gaussian-NPE u-space mu/Sigma path: `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/gaussian_npe_u_posterior.npz`.
 - Expected 10k sample path: `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z/posterior_samples_10k.npz`.
@@ -197,6 +199,7 @@ path.
 - Smoke-test result: generated summaries had shape `(8, 7)`, all finite values, zero positive-definiteness failures, zero additional-jitter uses, and max jitter used equal to the base `1e-6` rule.
 - Submission status: no job submitted; no full array submitted.
 - Cache status: empirical GNK caches were not overwritten.
+- Observed-summary caveat: the NUTS cache path records posterior samples; it does not provide an independent observed-summary file in the prepared output. The control config records the regenerated observed-summary convention, and the HPC preflight should verify the seed-88 NUTS cache exists before submission.
 - Interpretation: pending. Do not compare `metrics.json` KL/MMD to the reviewed decomposition table. Scientific comparison requires the post-run `u_space_decomposition.json`, and the empirical-GNK high-budget calibration still needs the same reviewed u-space evaluation before any apples-to-apples interpretation.
 
 ## Hexadecile Aggregation
