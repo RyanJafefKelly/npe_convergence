@@ -1,0 +1,21 @@
+{
+  "commit": "4df05eb",
+  "created_at_utc": "2026-04-25T01:50:51.693698+00:00",
+  "delta_plot_exclude_N_equals_n": true,
+  "delta_plot_groups": 12,
+  "delta_plot_min_N_over_n": 1.0,
+  "delta_plot_min_seeds": 101,
+  "delta_plot_rows": 1212,
+  "input_csv": "notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv",
+  "input_rows": 1617,
+  "notes": [
+    "Delta components are native u-space Gaussian-NPE approximation error.",
+    "Coordinate offset is K_u^* - K_theta^*, explicitly u-space minus theta-space.",
+    "Axis labels include theta-space/u-space where relevant."
+  ],
+  "outputs": [
+    "notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_mean_cov.pdf",
+    "notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_coord_offset_vs_n.pdf"
+  ],
+  "script": "scripts/plot_gnk_u_space_kl_decomp.py"
+}

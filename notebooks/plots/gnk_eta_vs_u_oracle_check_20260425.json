@@ -1,0 +1,55 @@
+{
+  "commit": "4df05eb",
+  "created_at_utc": "2026-04-25T01:43:11.817796+00:00",
+  "max_abs_difference": 0.016437561739635287,
+  "notes": [
+    "Exact KL is affine invariant, but finite-sample kNN estimates can differ under diagonal standardisation.",
+    "This check regenerates training mu_eta/sigma_eta for selected n:N:seed triples."
+  ],
+  "output_csv": "notebooks/plots/gnk_eta_vs_u_oracle_check_20260425.csv",
+  "rows": [
+    {
+      "K_u_eta_knn": 1.614577601265733,
+      "K_u_standardised_knn": 1.5981400395260976,
+      "N": 1000,
+      "clip_count_nuts": 0,
+      "difference_standardised_minus_eta": -0.016437561739635287,
+      "eta_kl_jitter": 1e-12,
+      "mu_eta": "-0.04573726282,-0.01196492277,-0.1063863263,0.01125007868",
+      "n": 100,
+      "nuts_cache_path": "res/gnk/nuts_cache_v2_n_obs_100_seed_0.pkl",
+      "seed": 0,
+      "sigma_eta": "1.762403727,1.792261839,1.728129745,1.837396383",
+      "standardised_u_kl_jitter": 1e-12
+    },
+    {
+      "K_u_eta_knn": 0.08790829854565069,
+      "K_u_standardised_knn": 0.0955608867353873,
+      "N": 3107,
+      "clip_count_nuts": 0,
+      "difference_standardised_minus_eta": 0.007652588189736617,
+      "eta_kl_jitter": 0.0,
+      "mu_eta": "0.01228165999,0.05451362208,0.03157461807,-0.05640247464",
+      "n": 500,
+      "nuts_cache_path": "res/gnk/nuts_cache_v2_n_obs_500_seed_0.pkl",
+      "seed": 0,
+      "sigma_eta": "1.806990623,1.79454565,1.758833408,1.851729751",
+      "standardised_u_kl_jitter": 0.0
+    },
+    {
+      "K_u_eta_knn": 0.053975340847339404,
+      "K_u_standardised_knn": 0.05280726292523755,
+      "N": 42585,
+      "clip_count_nuts": 0,
+      "difference_standardised_minus_eta": -0.0011680779221018567,
+      "eta_kl_jitter": 0.0,
+      "mu_eta": "-0.0002307791146,0.007326913532,-0.0009074079571,0.003011419903",
+      "n": 5000,
+      "nuts_cache_path": "res/gnk/nuts_cache_v2_n_obs_5000_seed_0.pkl",
+      "seed": 0,
+      "sigma_eta": "1.801353693,1.815927863,1.821487665,1.822668433",
+      "standardised_u_kl_jitter": 0.0
+    }
+  ],
+  "script": "scripts/check_gnk_eta_vs_u_oracle.py"
+}

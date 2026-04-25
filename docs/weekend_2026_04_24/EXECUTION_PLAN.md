@@ -7,9 +7,9 @@ Support the theory-first JMLR paper by clarifying finite-N NPE approximation und
 ## Current priority order
 
 1. n=500 BvM oracle gate. Completed: median K_theta^*(n=500) = 0.099533 nats over 101 seeds; acceptable by the median-based <= 0.1 rule, but borderline.
-2. Coordinate reconciliation: theta oracle, u oracle, coordinate offset.
-3. Gaussian-NPE u-space KL decomposition.
-4. Log-corrected scaled-budget plots.
+2. Coordinate reconciliation: theta oracle, u oracle, coordinate offset. Completed on `exp-u-space-kl-decomp`; scientific-code review issues addressed.
+3. Gaussian-NPE u-space KL decomposition. Completed on `exp-u-space-kl-decomp`; scientific-code review issues addressed.
+4. Log-corrected scaled-budget plots. Use `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`; exclude `N=n` and incomplete seed-count groups from main theorem-facing panels unless explicitly labelled diagnostic.
 5. HPC calibration for high-budget GNK curve.
 6. gnk_model simulator-control pilot.
 7. Hexadecile aggregation.

@@ -1,0 +1,106 @@
+{
+  "N_values_by_n": {
+    "100": [
+      100,
+      460,
+      1000,
+      10000
+    ],
+    "1000": [
+      1000,
+      6907,
+      31622,
+      31623,
+      1000000
+    ],
+    "500": [
+      500,
+      3107,
+      11180,
+      250000
+    ],
+    "5000": [
+      5000,
+      42585,
+      353553,
+      25000000
+    ]
+  },
+  "cache_dir": "res/gnk",
+  "commit": "4df05eb",
+  "created_at_utc": "2026-04-25T01:43:25.673014+00:00",
+  "n_values": [
+    100,
+    500,
+    1000,
+    5000
+  ],
+  "notes": [
+    "K_theta_oracle is the theta-space BvM-premise diagnostic.",
+    "coord_offset = K_u_oracle - K_theta_oracle is the coordinate-projection offset.",
+    "Delta_u_total is native u-space Gaussian-NPE approximation error, not a pure BvM residual.",
+    "Qhat_N,u is reconstructed from sample moments of saved Gaussian-NPE posterior samples.",
+    "The affine standardisation constants mu_eta/sigma_eta are not regenerated for the full grid. Exact KL and analytic Gaussian-Gaussian decomposition terms are invariant to that common affine map, but finite-sample kNN K_u^* estimates may differ slightly after diagonal standardisation.",
+    "Sample-based Perez-Cruz KL estimates are retried with deterministic tiny jitter eps * max(pooled_sd, 1.0) only when duplicate/zero nearest-neighbour distances produce non-finite values."
+  ],
+  "output_csv": "notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv",
+  "rows": 1617,
+  "seed_count_by_n_N": {
+    "n=100,N=100": 101,
+    "n=100,N=1000": 101,
+    "n=100,N=10000": 101,
+    "n=100,N=460": 101,
+    "n=1000,N=1000": 101,
+    "n=1000,N=1000000": 101,
+    "n=1000,N=31622": 101,
+    "n=1000,N=31623": 1,
+    "n=1000,N=6907": 101,
+    "n=500,N=11180": 101,
+    "n=500,N=250000": 101,
+    "n=500,N=3107": 101,
+    "n=500,N=500": 101,
+    "n=5000,N=25000000": 101,
+    "n=5000,N=353553": 101,
+    "n=5000,N=42585": 101,
+    "n=5000,N=5000": 101
+  },
+  "skipped": [],
+  "summaries": {
+    "Delta_u_cov": {
+      "median": 3.776737496870976,
+      "q25": 2.438437604937132,
+      "q75": 5.593171699958164
+    },
+    "Delta_u_mean": {
+      "median": 1.0089297086369555,
+      "q25": 0.5371151220636178,
+      "q75": 1.6154201893683235
+    },
+    "Delta_u_total": {
+      "median": 4.871099755623828,
+      "q25": 3.337669052903752,
+      "q75": 7.171506526162977
+    },
+    "K_theta_oracle": {
+      "median": 0.08365027473609934,
+      "q25": 0.023198904433367664,
+      "q75": 0.22991179166175876
+    },
+    "K_u_oracle": {
+      "median": 0.06617885576698027,
+      "q25": 0.0012930473810312958,
+      "q75": 0.25407654994645074
+    },
+    "coord_offset": {
+      "median": -0.018106842034474567,
+      "q25": -0.08307265905716404,
+      "q75": 0.031088239750834457
+    },
+    "self_consistency_kl_u": {
+      "median": 0.0016936906326964444,
+      "q25": -0.034158850821308054,
+      "q75": 0.03447624350772889
+    }
+  },
+  "task": "gnk-coordinate-aware-u-space-kl-decomp"
+}

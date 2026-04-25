@@ -38,22 +38,56 @@ from the fitted Gaussian.
 
 ## Coordinate Reconciliation and u-space KL Decomposition
 
-Status: pending.
+Status: completed after scientific-code review.
 
-Required record:
+Implemented a coordinate-aware Gaussian-NPE decomposition for cached GNK runs.
+The script reads existing NUTS and Gaussian-NPE sample caches only, reconstructs
+`Qhat_N,u` from saved Gaussian-NPE posterior sample moments in the logit
+coordinate. Exact KLs and analytic Gaussian-Gaussian decomposition terms are
+invariant to the common affine standardisation by `mu_eta/sigma_eta`; finite-
+sample kNN oracle estimates are eta-coordinate estimates of the same exact
+u-space target and may differ slightly after diagonal standardisation.
 
-- Command:
-- Commit hash:
-- Cache paths used:
-- Output table path:
+- Subset check command: `python scripts/compute_gnk_u_space_kl_decomp.py --n-values 500 --N-values 500 --seeds 0,1 --output-prefix gnk_u_space_kl_decomp_20260425_subset`
+- Subset plot command: `python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_subset_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_subset`
+- Full table command: `python scripts/compute_gnk_u_space_kl_decomp.py --output-prefix gnk_u_space_kl_decomp_20260425`
+- Main plot command: `python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_N_gt_n --exclude-N-equals-n --min-seeds 101`
+- Eta-vs-standardised-u robustness command: `python scripts/check_gnk_eta_vs_u_oracle.py`
+- Run-time git hash recorded in outputs: `4df05eb`; reviewed implementation/output commit `1da4752` archives the scripts, documentation, and generated outputs.
+- CSV/summary timestamp after the clipping-count/doc-caveat rerun: `2026-04-25T01:43:25.673014+00:00`.
+- Figure metadata timestamp after excluding the one-seed diagnostic row: `2026-04-25T01:50:51.693698+00:00`.
+- Cache paths used: `res/gnk/nuts_cache_v2_n_obs_{n}_seed_{seed}.pkl`, `res/gnk/nuts_cache_v2_flow_n_obs_{n}_seed_{seed}.pkl`, and `res/gnk/gaussian_npe_n_obs_{n}_n_sims_{N}_seed_{seed}/posterior_samples.pkl`.
+- Cache access: read-only; no cache files were overwritten.
+- Output table path: `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`.
+- Summary metadata path: `notebooks/plots/gnk_u_space_kl_decomp_20260425_summary.json`.
 - Figure paths:
-- K_theta^* summary:
-- K_u^* summary:
-- Coordinate offset summary:
-- Delta_N,u total summary:
-- Delta_N,u mean/cov split:
-- Self-consistency check:
-- Interpretation caveat: Delta_N,u is native-coordinate Gaussian-NPE error, not pure BvM residual.
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_delta_u_mean_cov.pdf`
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_coord_offset_vs_n.pdf`
+  - `notebooks/plots/gnk_u_space_kl_decomp_20260425_N_gt_n_plot_metadata.json`
+- Eta-vs-standardised-u robustness output:
+  - `notebooks/plots/gnk_eta_vs_u_oracle_check_20260425.csv`
+  - `notebooks/plots/gnk_eta_vs_u_oracle_check_20260425.json`
+- Rows: 1,617 per-seed/per-config rows over `n in {100, 500, 1000, 5000}`. The raw table includes `N=n` rows as low-budget diagnostics and retains the one-seed legacy `n=1000,N=31623` row; the main Delta component figure excludes `N=n` and requires at least 101 seeds per `(n,N)` group.
+- Grid completeness:
+  - n=100: N=100, 460, 1000, 10000 each have 101 seeds.
+  - n=500: N=500, 3107, 11180, 250000 each have 101 seeds.
+  - n=1000: N=1000, 6907, 31622, 1000000 each have 101 seeds; N=31623 has 1 seed and is retained as a legacy single-run diagnostic.
+  - n=5000: N=5000, 42585, 353553, 25000000 each have 101 seeds.
+- K_theta^* median by n: n=100: 0.669815; n=500: 0.099535; n=1000: 0.048707; n=5000: 0.005491 nats.
+- K_u^* median by n: n=100: 0.556715; n=500: 0.081014; n=1000: 0.043254; n=5000: -0.007986 nats.
+- Coordinate offset median by n: n=100: -0.088838; n=500: -0.013023; n=1000: -0.009555; n=5000: -0.007648 nats.
+- Delta_N,u over all raw rows: total median 4.871100 nats, IQR [3.337669, 7.171507]; mean component median 1.008930; covariance component median 3.776737.
+- Delta_N,u over `N>n` rows: total median 4.055106 nats, IQR [2.923939, 5.440763]; mean component median 0.861482; covariance component median 3.261894.
+- Median Delta_N,u split by `(n,N)` for `N>n`:
+  - n=100: N=460 total 6.083045, mean 1.752549, cov 4.161703; N=1000 total 5.314056, mean 1.659089, cov 3.665982; N=10000 total 3.285552, mean 1.082266, cov 2.107228.
+  - n=500: N=3107 total 6.860109, mean 1.569612, cov 5.344438; N=11180 total 4.441182, mean 0.668807, cov 3.750724; N=250000 total 2.634332, mean 0.437295, cov 2.103115.
+  - n=1000: N=6907 total 5.722742, mean 0.908342, cov 4.832505; N=31622 total 3.777168, mean 0.429033, cov 3.327859; N=31623 total 5.095534, mean 0.980671, cov 4.114863; N=1000000 total 2.386606, mean 0.417457, cov 1.819056.
+  - n=5000: N=42585 total 4.418036, mean 0.682200, cov 3.704735; N=353553 total 2.933239, mean 0.541313, cov 2.353513; N=25000000 total 2.602777, mean 0.514448, cov 2.069701.
+- Self-consistency check: reconstructed `Qhat_N,u` versus fresh samples from the reconstructed Gaussian has median Perez-Cruz KL 0.001694 nats over all rows and 0.001446 nats over `N>n` rows, consistent with saved samples matching their reconstructed u-space Gaussian. Earlier free-text audit notes reported fresh-resample self-consistency near zero; no machine-readable cache for those diagnostics was found, so this script recomputes the check.
+- Eta-vs-standardised-u robustness check: exact KL and analytic Gaussian-Gaussian terms are affine invariant, but finite-sample kNN estimates need not be invariant to diagonal standardisation. For representative checks `(n,N,seed)=(100,1000,0),(500,3107,0),(5000,42585,0)`, the standardised-u minus eta K_u^* differences were -0.016438, +0.007653, and -0.001168 nats, respectively. These are small relative to the main medians/IQRs, but K_u^* should be described as a finite-sample eta-coordinate kNN estimate of the same exact u-space target.
+- Clipping check: the logit transform clips theta to `[1e-6, 10-1e-6]`. Gaussian-NPE sample clipping count is zero across the full table. NUTS clipping count is one sample total across unique `(n,seed)` NUTS caches, so clipping is negligible.
+- Numerical note: sample-based Perez-Cruz oracle KL estimates were retried with deterministic Gaussian jitter at scale `eps * max(pooled_sd, 1.0)` only when duplicate/zero nearest-neighbour distances produced non-finite values. This occurred for 26 unique n=100 seeds for both theta-space and u-space oracle KL, appearing as 104 repeated rows in the per-config table for each KL type because oracle values are repeated across N for a fixed `(n, seed)`. No n=500, n=1000, or n=5000 oracle rows needed jitter. Analytic Gaussian-Gaussian `Delta_N,u` terms were finite without this estimator.
+- Interpretation caveat: `K_theta^*` is the theta-space BvM-premise diagnostic. `K_u^* - K_theta^*` is the coordinate-projection offset. `Delta_N,u` is native u-space Gaussian-NPE approximation error, not a pure BvM residual.
 
 ## Log-Corrected Scaled-Budget Plots
 
