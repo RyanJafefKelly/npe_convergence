@@ -119,22 +119,26 @@ log-corrected panel.
 
 ## HPC Calibration
 
-Status: pending after n=500 oracle gate. Full high-budget array submission remains blocked pending one calibration job and explicit dry-run review.
-
-Required record:
+Status: submitted. Full high-budget array submission remains blocked pending
+completion, timing/output-integrity review, and explicit dry-run review.
 
 - Selected n: 500.
-- Calibration x:
-- Resolved N:
-- Seed:
-- Dry-run command:
-- Submit command:
-- Output directory:
-- Timing metadata path:
-- Validation curve path:
-- Predicted Gaussian-NPE u-space mu/Sigma path:
-- Sample path:
-- Recommendation for full array:
+- Calibration x: 50.
+- Resolved N: 3,025,000.
+- Seed: 88.
+- Seed-selection rule: closest finite `Delta_u_total` to the median among complete-seed `n=500,N=250000` rows in `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`; seed 88 equals the median `Delta_u_total=2.634332000648568`.
+- Dry-run command: `python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml`
+- Submit command: `qsub npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh`
+- Scheduler job id: `20344975.aqua`.
+- Output directory: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z`.
+- Timing metadata path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json`.
+- Validation curve path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv`.
+- Predicted Gaussian-NPE u-space mu/Sigma path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`.
+- Sample path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`.
+- Stdout log path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stdout.log`.
+- Stderr log path: `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/logs/stderr.log`.
+- Recommendation for full array: pending until job completion and output-integrity/timing review.
+- Note: no full high-budget array was submitted.
 
 ## gnk_model Simulator-Control Pilot
 

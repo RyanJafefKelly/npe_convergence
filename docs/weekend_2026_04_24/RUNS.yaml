@@ -57,7 +57,7 @@ runs:
     notes: "Preserves x = N/(d^2 n) and adds x_log = N/(d^2 n log(N)^2) in a companion two-panel scaled-budget figure with shared y-axis. Natural logs are used. The dotted reference overlay is proportional to log(N)/sqrt(N/(d^2 n)); equivalently proportional to 1/sqrt(x_log) in the log-corrected panel. The log-corrected panel is a finite-N visualisation of the existing BvM logarithmic factor, not a new rate."
 
   - id: gnk-hpc-calibration
-    status: prepared
+    status: submitted
     branch: exp-hpc-calibration
     command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
     selected_n: 500
@@ -129,7 +129,7 @@ runs:
     dry_run_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --config res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
     prepare_command: "python npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py --dry-run --write-config --selected-x 50 --created-at 2026-04-25T06:50:35Z --run-id gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
     submit_command: "qsub npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh"
-    scheduler_job_id: null
+    scheduler_job_id: "20344975.aqua"
     output_dir: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
     expected_outputs:
       config: "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/config.yaml"
@@ -152,7 +152,7 @@ runs:
       - "npe_convergence/scripts/run_gnk_gaussian_hpc_calibration.py"
       - "npe_convergence/scripts/pbs_jobs/gnk_gaussian_hpc_calibration_n500_x50_seed88.sh"
     decision_needed: "After calibration, decide whether the full high-budget array is feasible and which x grid to submit."
-    notes: "Prepared exactly one non-array n=500 Gaussian-NPE calibration job. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 is plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. This local machine is not an HPC submit environment, so no job was submitted and no full array was submitted. Full high-budget array remains blocked pending review of this calibration result and dry-run table."
+    notes: "Submitted exactly one non-array n=500 Gaussian-NPE calibration job on Aquarius as PBS job 20344975.aqua after the HPC dry-run showed no selected-runtime-output collisions beyond the existing config. Dry-run table covers x=25 and x=50. Selected x=50 because it is the preferred calibration point and N=3,025,000 is plausible under existing 47-48h/64GB PBS patterns while remaining a single calibration run. No full array was submitted. Full high-budget array remains blocked pending review of this calibration result and output-integrity/timing metadata."
 
   - id: gnk-model-control-pilot
     status: blocked
