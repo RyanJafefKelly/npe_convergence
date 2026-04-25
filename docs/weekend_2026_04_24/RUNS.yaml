@@ -16,6 +16,7 @@ runs:
   - id: gnk-coordinate-u-kl-decomp
     status: completed
     branch: exp-u-space-kl-decomp
+    reviewed_implementation_commit: 1da4752
     command: "python scripts/compute_gnk_u_space_kl_decomp.py --output-prefix gnk_u_space_kl_decomp_20260425 && python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_N_gt_n --exclude-N-equals-n --min-seeds 101"
     inputs:
       cache:

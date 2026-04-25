@@ -53,7 +53,7 @@ u-space target and may differ slightly after diagonal standardisation.
 - Full table command: `python scripts/compute_gnk_u_space_kl_decomp.py --output-prefix gnk_u_space_kl_decomp_20260425`
 - Main plot command: `python scripts/plot_gnk_u_space_kl_decomp.py --input-csv notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv --output-prefix gnk_u_space_kl_decomp_20260425_N_gt_n --exclude-N-equals-n --min-seeds 101`
 - Eta-vs-standardised-u robustness command: `python scripts/check_gnk_eta_vs_u_oracle.py`
-- Run-time git hash recorded in outputs: `4df05eb`; the enclosing task commit archives the reviewed implementation, documentation, and generated outputs.
+- Run-time git hash recorded in outputs: `4df05eb`; reviewed implementation/output commit `1da4752` archives the scripts, documentation, and generated outputs.
 - CSV/summary timestamp after the clipping-count/doc-caveat rerun: `2026-04-25T01:43:25.673014+00:00`.
 - Figure metadata timestamp after excluding the one-seed diagnostic row: `2026-04-25T01:50:51.693698+00:00`.
 - Cache paths used: `res/gnk/nuts_cache_v2_n_obs_{n}_seed_{seed}.pkl`, `res/gnk/nuts_cache_v2_flow_n_obs_{n}_seed_{seed}.pkl`, and `res/gnk/gaussian_npe_n_obs_{n}_n_sims_{N}_seed_{seed}/posterior_samples.pkl`.
