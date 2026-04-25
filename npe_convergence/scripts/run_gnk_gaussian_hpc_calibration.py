@@ -23,22 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import jax.numpy as jnp
-import jax.random as random
-import numpy as np
-import numpyro  # type: ignore
-import numpyro.distributions as dist  # type: ignore
 import yaml
-from jax.scipy.special import expit, logit
-
-from npe_convergence.examples.gnk import gnk, get_summaries_batches, ss_octile
-from npe_convergence.methods.gaussian_npe import (
-    ConditionalGaussianNPE,
-    TrainConfig,
-    fit,
-    sample,
-)
-from npe_convergence.metrics import kullback_leibler, median_heuristic, unbiased_mmd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -390,6 +375,21 @@ def save_losses(losses: dict[str, list[float]], output_dir: Path) -> None:
 
 
 def run_calibration(config: dict[str, Any]) -> int:
+    import jax.numpy as jnp
+    import jax.random as random
+    import numpy as np
+    import numpyro.distributions as dist  # type: ignore
+    from jax.scipy.special import expit, logit
+
+    from npe_convergence.examples.gnk import gnk, get_summaries_batches, ss_octile
+    from npe_convergence.methods.gaussian_npe import (
+        ConditionalGaussianNPE,
+        TrainConfig,
+        fit,
+        sample,
+    )
+    from npe_convergence.metrics import kullback_leibler, median_heuristic, unbiased_mmd
+
     output_dir = REPO_ROOT / config["output_dir"]
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "logs").mkdir(parents=True, exist_ok=True)
@@ -598,9 +598,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.config:
         parser.error("run mode requires --config")
+    import numpyro  # type: ignore
+
+    numpyro.set_host_device_count(4)
     return run_calibration(config)
 
 
 if __name__ == "__main__":
-    numpyro.set_host_device_count(4)
     raise SystemExit(main())
