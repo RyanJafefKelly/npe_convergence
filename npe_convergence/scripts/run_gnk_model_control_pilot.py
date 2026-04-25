@@ -19,6 +19,7 @@ import socket
 import subprocess
 import sys
 import time
+import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -191,7 +192,11 @@ def build_config(
             "mvn_mean_function": "npe_convergence.examples.gnk.gnk at normal quantiles",
             "mvn_covariance_function": "npe_convergence.examples.gnk.compute_covariance_matrix",
             "base_jitter": 1e-6,
-            "additional_jitter_grid": [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
+            "covariance_handling": (
+                "Use gnk_model's 1e-6 diagonal jitter. Resample rare prior "
+                "draws whose asymptotic covariance is still non-SPD or non-finite; "
+                "record invalid_covariance_* counts in simulator_diagnostics.json."
+            ),
         },
         "output_dir": output_dir,
         "scheduler_resource_request": RESOURCE_REQUEST,
@@ -421,22 +426,23 @@ def _sample_asymptotic_mvn_batch(key, theta_batch, n_obs: int):
     )(A, B, g, k)
 
     eye = jnp.eye(D_S)
-    jitter_grid = jnp.asarray([1e-6, 1.01e-6, 1.1e-6, 2e-6, 1.1e-5, 1.01e-4, 1.001e-3])
+    base_jitter = 1e-6
 
     def choose_cov(cov):
-        def one(scale):
-            candidate = cov + scale * eye
-            chol = jnp.linalg.cholesky(candidate)
-            ok = jnp.all(jnp.isfinite(chol))
-            eig_min = jnp.linalg.eigvalsh(candidate)[0]
-            ok = jnp.logical_and(ok, eig_min > 0)
-            return ok, chol, eig_min
+        cov = 0.5 * (cov + cov.T)
+        finite_cov = jnp.all(jnp.isfinite(cov))
+        cov_for_eig = jnp.where(finite_cov, cov, jnp.eye(D_S))
+        raw_min_eig = jnp.linalg.eigvalsh(cov_for_eig)[0]
+        candidate = cov_for_eig + base_jitter * eye
+        chol = jnp.linalg.cholesky(candidate)
+        regularized_min_eig = jnp.linalg.eigvalsh(candidate)[0]
+        ok = jnp.logical_and(finite_cov, jnp.all(jnp.isfinite(chol)))
+        ok = jnp.logical_and(ok, regularized_min_eig > 0)
+        return chol, raw_min_eig, regularized_min_eig, ok, finite_cov
 
-        ok, chols, eig_mins = jax.vmap(one)(jitter_grid)
-        idx = jnp.argmax(ok)
-        return chols[idx], jitter_grid[idx], eig_mins[idx], ok[idx]
-
-    chols, jitter_used, eig_min, ok = jax.vmap(choose_cov)(covs)
+    chols, raw_min_eig, regularized_min_eig, ok, finite_cov = (
+        jax.vmap(choose_cov)(covs)
+    )
     eps = random.normal(key, means.shape)
     draws = means + jnp.einsum("bij,bj->bi", chols, eps)
     diagnostics = {
@@ -444,51 +450,98 @@ def _sample_asymptotic_mvn_batch(key, theta_batch, n_obs: int):
         "summary_shape": [int(theta_batch.shape[0]), D_S],
         "finite_summary_count": int(jnp.isfinite(draws).sum()),
         "all_summaries_finite": bool(jnp.all(jnp.isfinite(draws))),
-        "pd_failure_count": int(jnp.count_nonzero(~ok)),
-        "additional_jitter_count": int(jnp.count_nonzero(jitter_used > jitter_grid[0])),
-        "max_jitter_used": float(jnp.max(jitter_used)),
-        "min_cov_eig_after_jitter": float(jnp.min(eig_min)),
+        "nonfinite_covariance_count": int(jnp.count_nonzero(~finite_cov)),
+        "invalid_covariance_count": int(jnp.count_nonzero(~ok)),
+        "max_jitter_used": base_jitter,
+        "min_raw_cov_eig": float(jnp.min(raw_min_eig)),
+        "min_cov_eig_after_jitter": float(jnp.min(regularized_min_eig)),
         "mvn_mean_function": "npe_convergence.examples.gnk.gnk",
         "mvn_covariance_function": "npe_convergence.examples.gnk.compute_covariance_matrix",
+        "covariance_regularisation_rule": (
+            "symmetrise covariance and add the same 1e-6 diagonal jitter used "
+            "by gnk_model; invalid prior draws are resampled and counted"
+        ),
     }
-    return draws, diagnostics
+    return draws, diagnostics, ok
 
 
 def sample_asymptotic_mvn_summaries(key, theta_bounded, n_obs: int, batch_size: int):
     import jax.numpy as jnp
     import jax.random as random
+    import numpy as np
 
     n_sims = int(theta_bounded.shape[0])
     batches = []
+    theta_batches = []
     aggregate = {
         "batches": 0,
         "simulations": n_sims,
         "summary_dimension": D_S,
-        "pd_failure_count": 0,
-        "additional_jitter_count": 0,
+        "nonfinite_covariance_count": 0,
+        "invalid_covariance_initial_count": 0,
+        "invalid_covariance_final_count": 0,
+        "invalid_covariance_resample_count": 0,
+        "max_resample_passes": 0,
         "max_jitter_used": 0.0,
+        "min_raw_cov_eig": math.inf,
         "min_cov_eig_after_jitter": math.inf,
         "all_summaries_finite": True,
         "mvn_mean_function": "npe_convergence.examples.gnk.gnk",
         "mvn_covariance_function": "npe_convergence.examples.gnk.compute_covariance_matrix",
         "base_jitter": 1e-6,
+        "covariance_regularisation_rule": (
+            "symmetrise covariance and add the same 1e-6 diagonal jitter used "
+            "by gnk_model; invalid prior draws are resampled and counted"
+        ),
     }
     for start in range(0, n_sims, batch_size):
         end = min(start + batch_size, n_sims)
+        theta_batch = theta_bounded[start:end]
         key, subkey = random.split(key)
-        draws, diag = _sample_asymptotic_mvn_batch(subkey, theta_bounded[start:end], n_obs)
+        draws, diag, ok = _sample_asymptotic_mvn_batch(subkey, theta_batch, n_obs)
+        initial_invalid = int(np.count_nonzero(~np.asarray(ok)))
+        resample_passes = 0
+        while initial_invalid and np.any(~np.asarray(ok)):
+            bad = np.asarray(~ok)
+            n_bad = int(np.count_nonzero(bad))
+            if resample_passes >= 20:
+                break
+            key, subkey_theta, subkey_summary = random.split(key, 3)
+            replacements = random.uniform(
+                subkey_theta,
+                shape=(n_bad, D_THETA),
+                minval=1e-6,
+                maxval=10 - 1e-6,
+            )
+            theta_batch = theta_batch.at[bad].set(replacements)
+            draws = draws.at[bad].set(0.0)
+            resample_passes += 1
+            draws, diag, ok = _sample_asymptotic_mvn_batch(
+                subkey_summary, theta_batch, n_obs
+            )
+            aggregate["invalid_covariance_resample_count"] += n_bad
+
+        final_invalid = int(np.count_nonzero(~np.asarray(ok)))
         batches.append(draws)
+        theta_batches.append(theta_batch)
         aggregate["batches"] += 1
-        aggregate["pd_failure_count"] += diag["pd_failure_count"]
-        aggregate["additional_jitter_count"] += diag["additional_jitter_count"]
+        aggregate["nonfinite_covariance_count"] += diag["nonfinite_covariance_count"]
+        aggregate["invalid_covariance_initial_count"] += initial_invalid
+        aggregate["invalid_covariance_final_count"] += final_invalid
+        aggregate["max_resample_passes"] = max(
+            aggregate["max_resample_passes"], resample_passes
+        )
         aggregate["max_jitter_used"] = max(aggregate["max_jitter_used"], diag["max_jitter_used"])
+        aggregate["min_raw_cov_eig"] = min(
+            aggregate["min_raw_cov_eig"], diag["min_raw_cov_eig"]
+        )
         aggregate["min_cov_eig_after_jitter"] = min(
             aggregate["min_cov_eig_after_jitter"], diag["min_cov_eig_after_jitter"]
         )
         aggregate["all_summaries_finite"] = (
             aggregate["all_summaries_finite"] and diag["all_summaries_finite"]
         )
-    return jnp.concatenate(batches, axis=0), aggregate
+    return jnp.concatenate(batches, axis=0), aggregate, jnp.concatenate(theta_batches, axis=0)
 
 
 def smoke_test(batch_size: int = 8, n_obs: int = N_OBS, seed: int = OBSERVED_SEED) -> dict[str, Any]:
@@ -500,13 +553,17 @@ def smoke_test(batch_size: int = 8, n_obs: int = N_OBS, seed: int = OBSERVED_SEE
     key, subkey = random.split(key)
     theta = dist.Uniform(1e-6, 10 - 1e-6).sample(subkey, (batch_size, D_THETA))
     key, subkey = random.split(key)
-    summaries, diagnostics = sample_asymptotic_mvn_summaries(
+    summaries, diagnostics, _ = sample_asymptotic_mvn_summaries(
         subkey, theta, n_obs=n_obs, batch_size=batch_size
     )
     diagnostics["requested_batch_size"] = batch_size
     diagnostics["observed_shape_ok"] = tuple(summaries.shape) == (batch_size, D_S)
     diagnostics["finite_values_ok"] = bool(jnp.all(jnp.isfinite(summaries)))
-    if not diagnostics["observed_shape_ok"] or not diagnostics["finite_values_ok"]:
+    if (
+        not diagnostics["observed_shape_ok"]
+        or not diagnostics["finite_values_ok"]
+        or diagnostics["invalid_covariance_final_count"] > 0
+    ):
         raise SystemExit(f"Smoke check failed: {diagnostics}")
     print(json.dumps(diagnostics, indent=2, sort_keys=True))
     return diagnostics
@@ -574,16 +631,16 @@ def run_pilot(config: dict[str, Any]) -> int:
 
         key, subkey = random.split(key)
         theta_bounded = dist.Uniform(1e-6, 10 - 1e-6).sample(subkey, (n_sims, D_THETA))
-        theta_eta = logit(theta_bounded / 10)
 
         sim_start = time.perf_counter()
         key, subkey = random.split(key)
-        summaries, simulator_diagnostics = sample_asymptotic_mvn_summaries(
+        summaries, simulator_diagnostics, theta_bounded = sample_asymptotic_mvn_summaries(
             subkey,
             theta_bounded,
             n_obs=n_obs,
             batch_size=min(1000, n_sims),
         )
+        theta_eta = logit(theta_bounded / 10)
         metadata["simulation_time_seconds"] = time.perf_counter() - sim_start
         metadata["simulations_per_second"] = (
             n_sims / metadata["simulation_time_seconds"]
@@ -594,12 +651,13 @@ def run_pilot(config: dict[str, Any]) -> int:
             json.dumps(simulator_diagnostics, indent=2, sort_keys=True)
         )
         if (
-            simulator_diagnostics["pd_failure_count"] > 0
+            simulator_diagnostics["invalid_covariance_final_count"] > 0
             or not simulator_diagnostics["all_summaries_finite"]
         ):
             raise RuntimeError(
                 "asymptotic-MVN simulator generated non-finite summaries "
-                "or unresolved covariance failures; see simulator_diagnostics.json"
+                "or unresolved covariance failures after resampling; "
+                "see simulator_diagnostics.json"
             )
 
         theta_mean = theta_eta.mean(axis=0)
@@ -707,15 +765,26 @@ def run_pilot(config: dict[str, Any]) -> int:
 def evaluate(config: dict[str, Any]) -> dict[str, Any]:
     import numpy as np
 
-    sys.path.insert(0, str(REPO_ROOT))
-    from scripts.compute_gnk_u_space_kl_decomp import (  # type: ignore
-        D_THETA as DECOMP_D_THETA,
-        D_TOTAL as DECOMP_D_TOTAL,
-        compute_oracle_moments,
-        gaussian_kl_decomp_from_moments,
-        self_consistency_kl_u,
-        theta_to_u_affine_invariant,
-    )
+    decomp_path = REPO_ROOT / "scripts" / "compute_gnk_u_space_kl_decomp.py"
+    if not decomp_path.exists():
+        raise FileNotFoundError(
+            "Missing reviewed decomposition helper: "
+            f"{rel(decomp_path)}. Pull the branch containing the u-space "
+            "decomposition script before running --evaluate."
+        )
+    spec = importlib.util.spec_from_file_location("gnk_u_space_decomp", decomp_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load decomposition helper from {rel(decomp_path)}")
+    decomp = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = decomp
+    spec.loader.exec_module(decomp)
+
+    DECOMP_D_THETA = decomp.D_THETA
+    DECOMP_D_TOTAL = decomp.D_TOTAL
+    compute_oracle_moments = decomp.compute_oracle_moments
+    gaussian_kl_decomp_from_moments = decomp.gaussian_kl_decomp_from_moments
+    self_consistency_kl_u = decomp.self_consistency_kl_u
+    theta_to_u_affine_invariant = decomp.theta_to_u_affine_invariant
 
     if DECOMP_D_THETA != D_THETA or DECOMP_D_TOTAL != D_TOTAL:
         raise RuntimeError("Decomposition constants do not match GNK octile control config.")
