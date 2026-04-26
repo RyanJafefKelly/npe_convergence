@@ -16,8 +16,8 @@ Evidence:
 
 ## Pending decisions
 
-- Which scaled-budget grid to use for high-budget GNK Gaussian-NPE.
-- Whether flow-NPE endpoints are worth running in the high-budget array.
+- Whether the completed n=500, x=50, seed-88 empirical-GNK calibration passes reviewed u-space decomposition format/sanity checks.
+- Whether Ryan approves the bounded high-budget dry-run table for submission.
 - Whether gnk_model simulator-control pilot results require a paper-framing change.
 
 ## 2026-04-25: GNK n=500 oracle gate
@@ -57,5 +57,16 @@ Implication: A staged high-budget run may be planned, but the full broad array r
 Evidence:
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json`
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/validation_curve.csv`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`
+
+## 2026-04-26: Bounded empirical-GNK high-budget array gate
+
+Decision: After the completed n=500, x=50, seed-88 empirical-GNK calibration is evaluated through the reviewed u-space decomposition and passes format/sanity checks, prepare a bounded staged Gaussian-NPE empirical-GNK array with n=500, x in {25,50}, seeds 0:100, reusing the existing x=50 seed-88 output when compatible.
+Reason: The n=500 theta-space oracle gate passed by the median rule, and the x=50 calibration completed successfully with low memory use and acceptable runtime. The remaining scientific question is whether the native u-space finite-N residual decays beyond the cached N=250000 regime.
+Implication: Do not launch x>50, flow-NPE endpoints, or a broad high-budget grid before reviewing the bounded array. Keep any running `gnk_model` simulator-control job isolated and evaluate it separately when it completes.
+Evidence:
+- `notebooks/plots/gnk_n500_oracle_gate_20260425_summary.json`
+- `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json`
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`

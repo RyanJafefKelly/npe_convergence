@@ -89,13 +89,16 @@ Priority order:
 3. Gaussian-NPE u-space KL decomposition.
 4. Log-corrected scaled-budget plots.
 5. HPC calibration for high-budget GNK curve. Completed: one non-array n=500, x=50, N=3,025,000 Gaussian-NPE calibration job completed in about 6.5h wall time with about 1.7GB RSS.
-6. Post-calibration high-budget diagnostic: evaluate the calibration output with the reviewed u-space decomposition before treating it as a theorem-facing high-budget point or approving any broad array.
-7. gnk_model simulator-control pilot.
-8. Hexadecile aggregation.
-9. MA2-b0 compatibility sanity check.
+6a. Evaluate completed empirical-GNK calibration output: n=500, x=50, N=3,025,000, seed=88, through the reviewed u-space decomposition.
+6b. If 6a passes, prepare a bounded high-budget empirical-GNK Gaussian-NPE dry-run only: n=500, x in {25,50}, seeds 0:100, reusing x=50 seed=88 if compatible.
+7. gnk_model simulator-control pilot, evaluated separately when complete.
+8. Hexadecile cache inventory and aggregation.
+9. MA2-b0 cache inventory and compatibility sanity check.
 10. Stereological only if nearly automatic.
 
-The broad high-budget HPC curve remains blocked until the completed calibration output is evaluated with the reviewed u-space decomposition and a staged x/seed grid dry-run is reviewed.
+The broad high-budget HPC curve is not the next step. Do not launch x > 50, flow-NPE endpoints, or the old broad x in {25,50,100,200,500} grid. The next empirical-GNK gate is operational correctness of the completed calibration output: schema compatibility, finite/sane u-space decomposition outputs, and no cache overwrites. After that, only a bounded x in {25,50} dry-run should be prepared until Ryan explicitly approves submission.
+
+If a `gnk_model` PBS job is running from the current worktree, do not mutate that worktree for empirical-GNK array preparation. Use a separate worktree or clone and evaluate `gnk_model` separately after it finishes.
 
 ## How to interpret outcomes
 

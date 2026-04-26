@@ -211,6 +211,37 @@ First HPC attempt:
 - Reported diagnostics: `simulations=3025000`, `batches=3025`, `all_summaries_finite=true`, `pd_failure_count=3917`, `additional_jitter_count=336`, `max_jitter_used=0.0010010000551119447`, and `min_cov_eig_after_jitter=-346.172119140625`.
 - Evaluation attempt on the failed output was not scientifically meaningful because training outputs were absent. A helper import bug in `--evaluate` was also fixed in `5d0f573` by loading `scripts/compute_gnk_u_space_kl_decomp.py` by file path.
 
+## 2026-04-26 Plan Refresh
+
+Status: administrative update only; no new computation.
+
+The weekend plan has been narrowed based on the completed n=500 oracle gate and
+the completed empirical-GNK x=50 seed-88 calibration. Priorities 1-5 are
+complete. The old high-budget priority is now split into:
+
+- 6a: evaluate the completed empirical-GNK calibration output through the reviewed u-space decomposition.
+- 6b: if 6a passes, prepare a bounded high-budget dry-run for empirical-GNK Gaussian-NPE with n=500, x in {25,50}, seeds 0:100.
+
+The remaining gate before array preparation is operational correctness, not
+scientific success: required files must exist, the calibration output schema
+must match the reviewed decomposition path, covariance checks and decomposition
+components must be finite/sane, and no cache may be overwritten. The raw
+`metrics.json` KL/MMD diagnostics remain calibration diagnostics and should not
+be used as the scientific comparison.
+
+Explicit blocks until further review:
+
+- no x > 50 high-budget GNK jobs;
+- no flow-NPE endpoints;
+- no old broad x in {25,50,100,200,500} grid;
+- no mutation of the worktree used by any running `gnk_model` PBS job;
+- no paper-framing changes by agents.
+
+The next intended bounded-array namespace is `res/gnk_high_budget/`, with a
+dry-run table recording one row per intended job and an explicit reuse or
+exclusion record for x=50 seed=88. Ryan should review the dry-run before any
+array submission.
+
 ## Hexadecile Aggregation
 
 Status: pending.
