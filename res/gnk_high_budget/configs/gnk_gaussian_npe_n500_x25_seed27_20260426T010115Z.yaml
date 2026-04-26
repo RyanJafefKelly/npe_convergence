@@ -1,0 +1,57 @@
+task: gnk-high-budget-array
+run_id: gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z
+created_at_utc: '2026-04-26T01:01:15Z'
+git_commit: 8bbbf4e
+git_dirty: true
+branch: exp-gnk-model-control
+method: Gaussian-NPE
+simulator: empirical_gnk_prior_predictive_octile_summaries
+n: 500
+d_s: 7
+d_theta: 4
+d: 11
+x: 25
+N: 1512500
+observed_seed: 27
+simulation_seed: 27
+training_seed: 27
+posterior_sampling_seed: 27
+output_dir: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z
+gpu_requested: false
+scheduler_resource_request:
+  scheduler: PBS
+  job_type: array
+  array_indices: 0-200
+  concurrency_cap: 20
+  walltime: '47:00:00'
+  mem: 64GB
+  ncpus: 4
+  ngpus: 0
+  resource_rationale: Matches the completed n=500, x=50, seed=88 calibration request.
+    That run used about 6.5h wall time and about 1.7GB peak RSS, but the dry-run keeps
+    the conservative 47h/64GB/4CPU envelope.
+train_config:
+  lr: 0.0005
+  batch_size: 256
+  max_epochs: 2000
+  patience: 200
+  val_frac: 0.1
+  hidden_dims:
+  - 128
+  - 128
+expected_outputs:
+  output_dir: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z
+  config: res/gnk_high_budget/configs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z.yaml
+  validation_curve: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/validation_curve.csv
+  validation_curve_plot: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/validation_curve.pdf
+  predicted_u_mean_cov: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/gaussian_npe_u_posterior.npz
+  samples_10k: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/posterior_samples_10k.npz
+  posterior_samples_pkl: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/posterior_samples.pkl
+  metrics: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/metrics.json
+  timing_metadata: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/timing_metadata.json
+  stdout_log: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/logs/stdout.log
+  stderr_log: res/gnk_high_budget/runs/gnk_gaussian_npe_n500_x25_seed27_20260426T010115Z/logs/stderr.log
+dry_run_only: true
+array_submitted: false
+notes: Prepared for review only. Submit with qsub only after explicit instruction
+  from Ryan.

@@ -1,0 +1,42 @@
+{
+  "N": 3025000,
+  "action": "reuse",
+  "compatibility": {
+    "compatible": true,
+    "config_checks": {
+      "N": true,
+      "d": true,
+      "method": true,
+      "n": true,
+      "observed_seed": true,
+      "posterior_sampling_seed": true,
+      "simulation_seed": true,
+      "simulator": true,
+      "training_seed": true,
+      "x": true
+    },
+    "expected_values": {
+      "N": 3025000,
+      "d": 11,
+      "method": "Gaussian-NPE",
+      "n": 500,
+      "observed_seed": 88,
+      "posterior_sampling_seed": 88,
+      "simulation_seed": 88,
+      "simulator": "empirical_gnk_prior_predictive_octile_summaries",
+      "training_seed": 88,
+      "x": 50
+    },
+    "missing_required_paths": [],
+    "source_output_dir": "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z"
+  },
+  "created_at_utc": "2026-04-26T01:01:15Z",
+  "d": 11,
+  "excluded_from_pbs_array": true,
+  "method": "Gaussian-NPE",
+  "n": 500,
+  "seed": 88,
+  "simulator": "empirical_gnk_prior_predictive_octile_summaries",
+  "source_output_dir": "res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z",
+  "x": 50
+}
