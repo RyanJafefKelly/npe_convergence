@@ -1,0 +1,35 @@
+{
+  "commit_hash": "593ccdd",
+  "created_at": "2026-05-23T23:17:10.326040+00:00",
+  "delta0_values": [
+    "1"
+  ],
+  "fresh_output_root": "res/ma2_b0_delta1_refresh",
+  "legacy_delta1_kl_rows": 0,
+  "legacy_delta1_mmd_rows": 0,
+  "manifest_csv": "docs/meeting_2026_05_18/ma2_delta1_refresh_plan/ma2_delta1_refresh_dry_run_manifest.csv",
+  "manifest_row_count": 3232,
+  "methods": [
+    "flow_npe",
+    "gaussian_npe"
+  ],
+  "n_obs": [
+    100,
+    500,
+    1000,
+    5000
+  ],
+  "note": "This is a dry-run manifest only. It does not launch the full grid. Run one pilot cell per method before submitting all rows.",
+  "output_collision_count": 0,
+  "output_collisions": [],
+  "output_dir_collision_count": 0,
+  "pbs_template": "docs/meeting_2026_05_18/ma2_delta1_refresh_plan/ma2_delta1_refresh_dry_run_pbs_template.sh",
+  "repo_root": "/Users/ryankelly/python_projects/npe_convergence",
+  "runtime_job_count": 3232,
+  "script": "npe_convergence/scripts/plan_ma2_b0_delta1_refresh.py",
+  "seed_count": 101,
+  "seed_max": 100,
+  "seed_min": 0,
+  "summary_json": "docs/meeting_2026_05_18/ma2_delta1_refresh_plan/ma2_delta1_refresh_dry_run_summary.json",
+  "table_md": "docs/meeting_2026_05_18/ma2_delta1_refresh_plan/ma2_delta1_refresh_dry_run_table.md"
+}
