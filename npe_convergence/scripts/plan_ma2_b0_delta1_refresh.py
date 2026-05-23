@@ -314,10 +314,9 @@ def write_table(path: Path, summary: dict[str, Any]) -> None:
 
 def write_pbs_template(path: Path, manifest_csv: Path, row_count: int) -> None:
     manifest_rel = rel(manifest_csv)
-    array_max = row_count - 1
     content = f"""#!/bin/bash -l
 #PBS -N ma2_delta1_refresh
-#PBS -J 0-{array_max}
+#PBS -J 1-{row_count}
 #PBS -l walltime=47:00:00
 #PBS -l mem=64GB
 #PBS -l ncpus=1
@@ -334,7 +333,8 @@ CMD=$(python - "$MANIFEST" "$PBS_ARRAY_INDEX" <<'PY'
 import csv
 import sys
 
-manifest, idx = sys.argv[1], int(sys.argv[2])
+manifest, pbs_idx = sys.argv[1], int(sys.argv[2])
+idx = pbs_idx - 1
 with open(manifest, newline="") as handle:
     row = next(row for ii, row in enumerate(csv.DictReader(handle)) if ii == idx)
 print(row["runtime_command"])
