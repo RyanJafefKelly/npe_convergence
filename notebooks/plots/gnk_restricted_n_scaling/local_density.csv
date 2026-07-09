@@ -1,0 +1,6 @@
+label,n_obs,seed,training_seed,n_sims,source,status,count_chi2_7_0p5,count_chi2_7_0p9,knn_distance_100,knn_distance_1000,knn_distance_10000
+full_prior,5000,50,50,25000000,missing_saved_training_summaries,unavailable,,,,,
+restricted_prior,5000,50,50,250000,/Users/ryankelly/python_projects/npe_convergence/res/gnk_restricted_prior/restricted_n_obs_5000_seed_50_conv_gaussian_n_sims_250000_train_50_20260526T060556Z/training_summaries.npz,ok,131032,203018,0.21660737800259988,0.36607035323484066,0.7356524287817601
+restricted_prior,5000,50,7,1000000,/Users/ryankelly/python_projects/npe_convergence/res/gnk_restricted_prior/restricted_n_obs_5000_seed_50_conv_gaussian_n_sims_1000000_train_7_20260526T062103Z/training_summaries.npz,ok,525540,811775,0.15570680645188004,0.26275428270990475,0.47484304404778443
+restricted_prior,5000,50,23,1000000,/Users/ryankelly/python_projects/npe_convergence/res/gnk_restricted_prior/restricted_n_obs_5000_seed_50_conv_gaussian_n_sims_1000000_train_23_20260526T075552Z/training_summaries.npz,ok,525540,811775,0.15570680645188004,0.26275428270990475,0.47484304404778443
+restricted_prior,5000,50,50,1000000,regenerated_restricted_prior,ok,525540,811775,0.15570680645187823,0.2627542827099011,0.47484304404778055

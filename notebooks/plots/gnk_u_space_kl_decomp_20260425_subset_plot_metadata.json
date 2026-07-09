@@ -1,0 +1,15 @@
+{
+  "commit": "4df05eb",
+  "created_at_utc": "2026-04-25T00:46:42.000618+00:00",
+  "input_csv": "notebooks/plots/gnk_u_space_kl_decomp_20260425_subset_per_seed.csv",
+  "notes": [
+    "Delta components are native u-space Gaussian-NPE approximation error.",
+    "Coordinate offset is K_u^* - K_theta^*, explicitly u-space minus theta-space.",
+    "Axis labels include theta-space/u-space where relevant."
+  ],
+  "outputs": [
+    "notebooks/plots/gnk_u_space_kl_decomp_20260425_subset_delta_u_mean_cov.pdf",
+    "notebooks/plots/gnk_u_space_kl_decomp_20260425_subset_coord_offset_vs_n.pdf"
+  ],
+  "script": "scripts/plot_gnk_u_space_kl_decomp.py"
+}

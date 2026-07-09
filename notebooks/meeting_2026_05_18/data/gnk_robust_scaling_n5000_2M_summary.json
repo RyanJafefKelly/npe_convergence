@@ -1,0 +1,21 @@
+{
+  "kl_value": 1.8834083896302738,
+  "marginal_shifts_in_nuts_sd": {
+    "A": -0.13160607767980062,
+    "B": 0.3171772511475209,
+    "g": 0.23898132714754836,
+    "k": 0.010344038276619385,
+    "max_abs": 0.3171772511475209
+  },
+  "mmd_value": 0.032313617333801004,
+  "n_obs": 5000,
+  "n_sims": 2000000,
+  "png": "gnk_robust_scaling_n5000_2M.png",
+  "seed": 50,
+  "standard_zscore_kl_value": 2.7239900402050017,
+  "standard_zscore_mmd_value": 0.2090282440185547,
+  "standard_zscore_n_sims": 25000000,
+  "status": "complete",
+  "stop_reason": "max_epochs",
+  "train_epochs": 810
+}

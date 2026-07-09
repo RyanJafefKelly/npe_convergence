@@ -110,6 +110,22 @@ def main():
         sa = float(np.sqrt(Sigma_asy[j, j]))
         print(f"{p:<5}{se:>14.5f}{sa:>14.5f}{se/sa:>10.3f}")
 
+    # Implied posterior-mean shift at the truth, in NUTS-sd units.
+    # Per Pro point 4: variance match is not enough; report mean shift too.
+    octile_mean_emp = octiles.mean(axis=0)
+    octile_mean_asy = np.asarray(b(jnp.asarray(TRUE_PARAMS)))
+    # Linearised parameter-mean shift =
+    #   (J^T V^{-1} J)^-1 J^T V^{-1} (mean_emp - mean_asy)
+    # using the empirical V. Use the asy-implied sd as the denominator for sd units.
+    residual_mean = octile_mean_emp - octile_mean_asy
+    delta_theta_mean = Sigma_emp @ grad_b.T @ V_emp_inv @ residual_mean
+    print("\n=== Implied posterior-mean shift at the truth (NUTS-sd units) ===")
+    print(f"{'param':<5}{'mean_shift':>14}{'sigma_asy':>14}{'shift/sigma':>14}")
+    for j, p in enumerate(PARAM_NAMES):
+        ms = float(delta_theta_mean[j])
+        sa = float(np.sqrt(Sigma_asy[j, j]))
+        print(f"{p:<5}{ms:>14.5f}{sa:>14.5f}{ms/sa:>14.5f}")
+
     # Also compute what the empirical sample OCTILES show for skew/kurtosis.
     print("\n=== Marginal skewness & excess kurtosis of sample octiles ===")
     from scipy.stats import skew, kurtosis

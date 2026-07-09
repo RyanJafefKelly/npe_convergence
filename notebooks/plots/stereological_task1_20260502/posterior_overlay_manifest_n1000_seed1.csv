@@ -1,0 +1,10 @@
+method,source,n,N,N_label,seed,has_samples,sample_count,path
+flow_npe,posterior_samples.pkl,1000,1000,N=n,1,1,10000,res/stereological/npe_n_obs_1000_n_sims_1000_seed_1/posterior_samples.pkl
+flow_npe,posterior_samples.pkl,1000,6907,N=n log(n),1,1,10000,res/stereological/npe_n_obs_1000_n_sims_6907_seed_1/posterior_samples.pkl
+flow_npe,posterior_samples.pkl,1000,31622,N=n^(3/2),1,1,10000,res/stereological/npe_n_obs_1000_n_sims_31622_seed_1/posterior_samples.pkl
+flow_npe,posterior_samples.pkl,1000,1000000,N=n^2,1,1,10000,res/stereological/npe_n_obs_1000_n_sims_1000000_seed_1/posterior_samples.pkl
+gaussian_npe,posterior_samples.pkl,1000,1000,N=n,1,0,0,res/stereological/gaussian_npe_n_obs_1000_n_sims_1000_seed_1/posterior_samples.pkl
+gaussian_npe,posterior_samples.pkl,1000,6907,N=n log(n),1,0,0,res/stereological/gaussian_npe_n_obs_1000_n_sims_6907_seed_1/posterior_samples.pkl
+gaussian_npe,posterior_samples.pkl,1000,31622,N=n^(3/2),1,0,0,res/stereological/gaussian_npe_n_obs_1000_n_sims_31622_seed_1/posterior_samples.pkl
+gaussian_npe,posterior_samples.pkl,1000,1000000,N=n^2,1,0,0,res/stereological/gaussian_npe_n_obs_1000_n_sims_1000000_seed_1/posterior_samples.pkl
+abc_smc,adaptive_smc_samples.pkl,1000,,ABC-SMC,1,1,6000,res/stereological_smc_abc/npe_n_obs_1000_n_sims_None_seed_1_max_iter_9/adaptive_smc_samples.pkl

@@ -11,6 +11,7 @@ Usage:
 import argparse
 import os
 import pickle as pkl
+from pathlib import Path
 
 import jax.numpy as jnp
 import jax.random as random
@@ -92,13 +93,32 @@ def get_nuts_posterior(
 
 
 def run_ma2_b0_gaussian(*args, **kwargs):
+    output_suffix = kwargs.get("output_suffix", "")
+    output_dir = kwargs.get("output_dir")
+    true_posterior_path = kwargs.get("true_posterior_path")
+    fail_if_output_exists = kwargs.get("fail_if_output_exists", False)
+    skip_coverage = kwargs.get("skip_coverage", False)
     try:
         seed, n_obs, n_sims = args
     except ValueError:
         args = args[0]
         seed, n_obs, n_sims = args.seed, args.n_obs, args.n_sims
+        output_suffix = getattr(args, "output_suffix", output_suffix)
+        output_dir = getattr(args, "output_dir", output_dir)
+        true_posterior_path = getattr(args, "true_posterior_path", true_posterior_path)
+        fail_if_output_exists = getattr(args, "fail_if_output_exists", fail_if_output_exists)
+        skip_coverage = getattr(args, "skip_coverage", skip_coverage)
 
-    dirname = f"res/ma2_b0/gaussian_npe_n_obs_{n_obs}_n_sims_{n_sims}_seed_{seed}/"
+    if output_dir is not None:
+        dirname = str(Path(output_dir))
+    else:
+        dirname = (
+            f"res/ma2_b0/gaussian_npe_n_obs_{n_obs}_n_sims_{n_sims}_seed_{seed}"
+            f"{output_suffix}"
+        )
+    dirname = dirname.rstrip(os.sep) + os.sep
+    if fail_if_output_exists and os.path.exists(dirname):
+        raise FileExistsError(f"Refusing to overwrite existing output directory: {dirname}")
     os.makedirs(dirname, exist_ok=True)
 
     # -- Ground truth data --------------------------------------------------
@@ -116,7 +136,12 @@ def run_ma2_b0_gaussian(*args, **kwargs):
     print("x_obs:", x_obs)
 
     # -- Exact posterior (NUTS, cached) -------------------------------------
-    true_posterior_samples = get_nuts_posterior(seed, x_obs, n_obs)
+    if true_posterior_path is not None:
+        print(f"Loading true posterior samples from {true_posterior_path}")
+        with open(true_posterior_path, "rb") as f:
+            true_posterior_samples = pkl.load(f)
+    else:
+        true_posterior_samples = get_nuts_posterior(seed, x_obs, n_obs)
     param_names = ["t1", "t2"]
     for ii, name in enumerate(param_names):
         plt.hist(true_posterior_samples[:, ii], bins=50, label=name)
@@ -232,6 +257,10 @@ def run_ma2_b0_gaussian(*args, **kwargs):
     with open(f"{dirname}mmd.txt", "w") as f:
         f.write(str(mmd))
 
+    if skip_coverage:
+        print("Skipping coverage analysis.")
+        return kl, mmd
+
     # -- Coverage analysis --------------------------------------------------
     num_coverage_samples = 100
     coverage_levels = [0.8, 0.9, 0.95]
@@ -286,5 +315,33 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=1_000)
     parser.add_argument("--n_sims", type=int, default=6_907)
+    parser.add_argument(
+        "--output_suffix",
+        type=str,
+        default="",
+        help="Optional suffix appended to the default output directory name.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Optional explicit output directory. Overrides --output_suffix.",
+    )
+    parser.add_argument(
+        "--true_posterior_path",
+        type=str,
+        default=None,
+        help="Optional existing reference posterior samples path to avoid rerunning NUTS.",
+    )
+    parser.add_argument(
+        "--fail_if_output_exists",
+        action="store_true",
+        help="Refuse to run if the selected output directory already exists.",
+    )
+    parser.add_argument(
+        "--skip_coverage",
+        action="store_true",
+        help="Stop after posterior samples and KL/MMD metrics are written.",
+    )
     args = parser.parse_args()
     run_ma2_b0_gaussian(args)

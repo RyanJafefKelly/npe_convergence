@@ -16,9 +16,7 @@ Evidence:
 
 ## Pending decisions
 
-- Whether the completed n=500, x=50, seed-88 empirical-GNK calibration passes reviewed u-space decomposition format/sanity checks.
-- Whether Ryan approves the bounded high-budget dry-run table for submission.
-- Whether gnk_model simulator-control pilot results require a paper-framing change.
+- Whether to rerun the 12 failed x=50 high-budget empirical-GNK seeds before treating x=50 as complete theorem-facing evidence.
 
 ## 2026-04-25: GNK n=500 oracle gate
 
@@ -70,3 +68,23 @@ Evidence:
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/timing_metadata.json`
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`
 - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`
+
+## 2026-04-30: GNK high-budget completed-only interpretation
+
+Decision: Treat the n=500, x=25 empirical-GNK Gaussian-NPE high-budget group as passable theorem-facing evidence for the current co-author update, and treat the usable x=50 group as incomplete diagnostic evidence.
+Reason: x=25 has all 101 seeds complete and passes reviewed u-space decomposition/schema checks, with median `Delta_N,u=2.062725` nats. x=50 has lower usable median `Delta_N,u=1.973945` nats but only 89 usable seeds because 12 planned x=50 seeds failed.
+Implication: The near-term narrative may say scaled-budget improvement is visible but finite-N/amortisation residuals remain substantial. Do not present x=50 as complete theorem-facing evidence unless the 12 failed seeds are rerun and evaluated.
+Evidence:
+- `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_summary.json`
+- `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_group_summary.csv`
+- `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_plot_metadata.json`
+
+## 2026-04-30: GNK model-control interpretation
+
+Decision: Treat the completed `gnk_asymptotic_mvn` simulator-control pilot as a single-seed diagnostic showing that the high-budget residual persists when the NPE training simulator matches the asymptotic MVN summary likelihood used by the NUTS reference.
+Reason: At n=500, x=50, seed=88, the corrected reviewed eta/u-space decomposition gives model-control `Delta_N,u=2.130125` nats, close to the empirical-GNK seed-88 x=50 `Delta_N,u=2.074183` nats. The residual is again mostly covariance.
+Implication: The result strengthens the finite-N/amortisation-residual interpretation and weakens the hypothesis that empirical simulator/control mismatch is the main explanation. Keep this as diagnostic evidence only unless more model-control seeds are run.
+Evidence:
+- `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/u_space_decomposition.json`
+- `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/timing_metadata.json`
+- `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/simulator_diagnostics.json`

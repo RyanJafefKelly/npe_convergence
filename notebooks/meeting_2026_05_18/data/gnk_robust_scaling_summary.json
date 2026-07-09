@@ -1,0 +1,185 @@
+{
+  "csv_path": "/Users/ryankelly/python_projects/npe_convergence/notebooks/meeting_2026_05_18/data/gnk_robust_scaling_overlay.csv",
+  "median_shifts_in_nuts_sd": {
+    "BSL": {
+      "A": -0.07155618811768312,
+      "B": -0.025458821645227774,
+      "g": 0.07013051876194334,
+      "k": 0.177831468114996,
+      "max_abs": 0.177831468114996
+    },
+    "Gaussian-NPE (robust asinh)": {
+      "A": -0.425589053464622,
+      "B": -0.4611986871984977,
+      "g": 0.4527206123209069,
+      "k": 0.07810831116029945,
+      "max_abs": 0.4611986871984977
+    },
+    "Gaussian-NPE (z-score)": {
+      "A": -0.7411000404888223,
+      "B": -0.9288309903615036,
+      "g": 4.036817120704995,
+      "k": 4.890477647039278,
+      "max_abs": 4.890477647039278
+    }
+  },
+  "metrics": {
+    "bsl": {
+      "kl_value": 0.14412774733394565,
+      "mmd_lengthscale": 0.33844017199339504,
+      "mmd_value": 0.002318533710254478,
+      "post_duplicates_removed": 14097,
+      "post_unique": 5903,
+      "ref_duplicates_removed": 45,
+      "ref_unique": 9955
+    },
+    "nuts_split_floor": {
+      "kl_value": 0.07363218500708332,
+      "mmd_lengthscale": 0.3380542038737297,
+      "mmd_value": 0.00011124616548641164,
+      "post_duplicates_removed": 26,
+      "post_unique": 4974,
+      "ref_duplicates_removed": 19,
+      "ref_unique": 4981
+    },
+    "robust_metrics": {
+      "args": {
+        "fixed_inner_scale": null,
+        "force": false,
+        "inner_scale_mode": "mad",
+        "n_obs": 1000,
+        "n_sims": 1000000,
+        "num_posterior_samples": 10000,
+        "output_root": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_robust_scale",
+        "seed": 0,
+        "sim_batch_size": 1000,
+        "transform": "asinh",
+        "v3_root": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_v3_refs"
+      },
+      "convention": "gaussian",
+      "fingerprint": {
+        "created_at_utc": "2026-05-26T07:06:28Z",
+        "environment": {
+          "cuda_visible_devices": null,
+          "git_branch": "codex/paper-empirical-push-2026-05-13",
+          "git_commit": "1d67235d14a1f3c8510ed458435f2f6d3e277d45",
+          "git_dirty": true,
+          "jax_backend": "cpu",
+          "jax_devices": [
+            "TFRT_CPU_0"
+          ],
+          "jax_version": "0.4.31",
+          "jax_x64_enabled": true,
+          "numpyro_version": "0.15.2",
+          "pbs_jobid": null,
+          "platform": "macOS-26.5-arm64-arm-64bit",
+          "python_version": "3.11.5"
+        },
+        "fixed_inner_scale": null,
+        "inner_scale_mode": "mad",
+        "inner_scale_per_coord": [
+          72.2538634311226,
+          5.512433806514342,
+          2.5359273335486776,
+          2.498610685252717,
+          2.8827196711023584,
+          21.48027639158879,
+          100.0
+        ],
+        "jax_enable_x64_env": "1",
+        "robust_center_per_coord": [
+          -0.8472374215815438,
+          -0.21045208655618491,
+          1.141076656527341,
+          1.4480530494135166,
+          1.841652888896102,
+          1.1967748472073394,
+          2.2681906051908167
+        ],
+        "robust_scale_per_coord": [
+          2.06438981115406,
+          1.4549931381147143,
+          0.897702387989206,
+          0.692372146230705,
+          0.4724889705186598,
+          1.036600865655167,
+          2.8129530717423012
+        ],
+        "transform": "asinh"
+      },
+      "kl_value": 1.3688184882348922,
+      "method": "gaussian_npe_robust_scale",
+      "metric_seconds": 0.46388270799070597,
+      "mmd_lengthscale": 0.38974688531561846,
+      "mmd_value": 0.05756348288996005,
+      "n_metric": 2000,
+      "n_obs": 1000,
+      "n_posterior_duplicates_removed": 0,
+      "n_posterior_samples": 10000,
+      "n_reference_duplicates_removed": 45,
+      "n_reference_samples": 10000,
+      "n_sims": 1000000,
+      "plotting_seconds": 0.593758875009371,
+      "ref_density_version": "phi_over_Qprime_v1_postfix_af438f5",
+      "ref_path": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_v3_refs/nuts_n_obs_1000_seed_0_conv_gaussian.pkl",
+      "ref_x_obs_sha256": "f52bed171814414e875aab2f99ff87adce5fd3cb7e79420b11987f194a4811cd",
+      "runtime_seconds": 10064.879702499995,
+      "sampling_seconds": 0.9098154160019476,
+      "seed": 0,
+      "simulation_seconds": 398.99294395900506,
+      "standardisation_seconds": 2.3210071659996174,
+      "train_config": {
+        "batch_size": 256,
+        "lr": 0.0005,
+        "max_epochs": 2000,
+        "patience": 200,
+        "val_frac": 0.1
+      },
+      "train_epochs": 1067,
+      "training_seconds": 9659.002723833008
+    },
+    "robust_recomputed": {
+      "kl_value": 1.4080730033945148,
+      "mmd_lengthscale": 0.391542421402417,
+      "mmd_value": 0.05513179067655294,
+      "post_duplicates_removed": 0,
+      "post_unique": 10000,
+      "ref_duplicates_removed": 45,
+      "ref_unique": 9955
+    },
+    "standard_metrics_v3": {
+      "convention": "gaussian",
+      "created_at_utc": "2026-05-26T03:00:49Z",
+      "kl_value": 4.704704115510156,
+      "method": "gaussian_npe",
+      "mmd_lengthscale": 0.5350721904901331,
+      "mmd_value": 0.7210269570350647,
+      "n_metric": 2000,
+      "n_obs": 1000,
+      "n_posterior_duplicates_removed": 0,
+      "n_posterior_samples": 10000,
+      "n_reference_duplicates_removed": 45,
+      "n_reference_samples": 10000,
+      "n_sims": 1000000,
+      "ref_density_version": "phi_over_Qprime_v1_postfix_af438f5",
+      "ref_path": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_v3_refs/nuts_n_obs_1000_seed_0_conv_gaussian.pkl",
+      "ref_x_obs_sha256": "f52bed171814414e875aab2f99ff87adce5fd3cb7e79420b11987f194a4811cd",
+      "rng_seed": 0,
+      "runtime_seconds": 0.2761612089962,
+      "seed": 0
+    },
+    "standard_recomputed": {
+      "kl_value": 4.765577942424422,
+      "mmd_lengthscale": 0.5327036424025814,
+      "mmd_value": 0.7089527298150977,
+      "post_duplicates_removed": 0,
+      "post_unique": 10000,
+      "ref_duplicates_removed": 45,
+      "ref_unique": 9955
+    }
+  },
+  "pdf_path": "/Users/ryankelly/python_projects/npe_convergence/docs/meeting_2026_05_18/gnk_robust_scaling_overlay.pdf",
+  "png_path": "/Users/ryankelly/python_projects/npe_convergence/docs/meeting_2026_05_18/gnk_robust_scaling_overlay.png",
+  "ref_path": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_v3_refs/nuts_n_obs_1000_seed_0_conv_gaussian.pkl",
+  "ref_x_obs_sha256": "f52bed171814414e875aab2f99ff87adce5fd3cb7e79420b11987f194a4811cd"
+}

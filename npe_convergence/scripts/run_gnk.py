@@ -86,15 +86,44 @@ def get_nuts_posterior_flow(
 # ---------------------------------------------------------------------------
 
 
-def run_gnk(*args, **kwargs):
-    try:
+def _namespace_or_kwarg(args, kwargs, name, default=None):
+    if name in kwargs:
+        return kwargs[name]
+    if len(args) == 1 and hasattr(args[0], name):
+        return getattr(args[0], name)
+    return default
+
+
+def _resolve_run_args(args, kwargs):
+    if len(args) == 3:
         seed, n_obs, n_sims = args
-    except ValueError:
-        args = args[0]
-        seed = args.seed
-        n_obs = args.n_obs
-        n_sims = args.n_sims
-    dirname = "res/gnk/npe_n_obs_" + str(n_obs) + "_n_sims_" + str(n_sims) + "_seed_" + str(seed) + "/"
+    elif len(args) == 1:
+        namespace = args[0]
+        seed = namespace.seed
+        n_obs = namespace.n_obs
+        n_sims = namespace.n_sims
+    elif not args:
+        seed = kwargs["seed"]
+        n_obs = kwargs["n_obs"]
+        n_sims = kwargs["n_sims"]
+    else:
+        raise ValueError("run_gnk expects a namespace, three positional values, or keyword values")
+
+    output_root = _namespace_or_kwarg(args, kwargs, "output_root", "res/gnk")
+    output_dir = _namespace_or_kwarg(args, kwargs, "output_dir")
+    return seed, n_obs, n_sims, output_root, output_dir
+
+
+def run_gnk(*args, **kwargs):
+    seed, n_obs, n_sims, output_root, output_dir = _resolve_run_args(args, kwargs)
+    if output_dir is None:
+        dirname = os.path.join(
+            str(output_root),
+            f"npe_n_obs_{n_obs}_n_sims_{n_sims}_seed_{seed}",
+        )
+    else:
+        dirname = str(output_dir)
+    dirname = dirname.rstrip("/") + "/"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     # key = random.PRNGKey(1)
@@ -307,5 +336,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--n_obs", type=int, default=1_000)
     parser.add_argument("--n_sims", type=int, default=10_000)
+    parser.add_argument("--output-root", type=str, default="res/gnk")
+    parser.add_argument("--output-dir", type=str)
     args = parser.parse_args()
     run_gnk(args)

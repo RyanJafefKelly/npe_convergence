@@ -1,0 +1,17 @@
+{
+  "created_at_utc": "2026-05-26T09:44:53Z",
+  "git_commit": "1d67235d14a1f3c8510ed458435f2f6d3e277d45",
+  "git_dirty": true,
+  "jax_version": "0.4.35",
+  "jax_enable_x64": true,
+  "noise_floor_kl": 0.0,
+  "noise_floor_kl_raw": -0.05320158017931312,
+  "missing_expected_cells": [
+    [
+      4000000,
+      50
+    ]
+  ],
+  "input_root": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_restricted_prior",
+  "v3_root": "/Users/ryankelly/python_projects/npe_convergence/res/gnk_v3_refs"
+}

@@ -1,0 +1,65 @@
+{
+  "N_values_by_n": {
+    "500": [
+      500
+    ]
+  },
+  "cache_dir": "res/gnk",
+  "commit": "4df05eb",
+  "created_at_utc": "2026-04-25T00:48:07.963162+00:00",
+  "n_values": [
+    500
+  ],
+  "notes": [
+    "K_theta_oracle is the theta-space BvM-premise diagnostic.",
+    "coord_offset = K_u_oracle - K_theta_oracle is the coordinate-projection offset.",
+    "Delta_u_total is native u-space Gaussian-NPE approximation error, not a pure BvM residual.",
+    "Qhat_N,u is reconstructed from sample moments of saved Gaussian-NPE posterior samples.",
+    "The affine standardisation constants mu_eta/sigma_eta are not regenerated because all reported KL/decomposition terms are invariant to that common affine map.",
+    "Sample-based Perez-Cruz KL estimates are retried with deterministic tiny jitter only when duplicate/zero nearest-neighbour distances produce non-finite values."
+  ],
+  "output_csv": "notebooks/plots/gnk_u_space_kl_decomp_20260425_subset_per_seed.csv",
+  "rows": 2,
+  "seed_count_by_n_N": {
+    "n=500,N=500": 2
+  },
+  "skipped": [],
+  "summaries": {
+    "Delta_u_cov": {
+      "median": 8.965865735458618,
+      "q25": 8.237982346441244,
+      "q75": 9.693749124475993
+    },
+    "Delta_u_mean": {
+      "median": 1.2645296480292965,
+      "q25": 1.0319275678629025,
+      "q75": 1.4971317281956906
+    },
+    "Delta_u_total": {
+      "median": 10.230395383487915,
+      "q25": 9.269909914304147,
+      "q75": 11.190880852671683
+    },
+    "K_theta_oracle": {
+      "median": 0.11222412968789067,
+      "q25": 0.10324126689891466,
+      "q75": 0.12120699247686667
+    },
+    "K_u_oracle": {
+      "median": 0.08521237052876146,
+      "q25": 0.08386440652031683,
+      "q75": 0.08656033453720607
+    },
+    "coord_offset": {
+      "median": -0.027011759159129213,
+      "q25": -0.03734258595654984,
+      "q75": -0.016680932361708593
+    },
+    "self_consistency_kl_u": {
+      "median": -0.05559631629036116,
+      "q25": -0.10111473868883195,
+      "q75": -0.010077893891890372
+    }
+  },
+  "task": "gnk-coordinate-aware-u-space-kl-decomp"
+}

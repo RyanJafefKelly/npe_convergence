@@ -11,6 +11,7 @@ import csv
 import math
 import pickle
 import re
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,14 @@ from typing import Iterable
 import numpy as np
 from scipy.stats import gaussian_kde
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.aggregate_stereological_blackjax_replicates import (  # noqa: E402
+    load_theta,
+    smallest_tau_snapshot,
+)
 
 PARAMS = ("lambda", "sigma", "xi")
 TRUE_VALUES = {"lambda": 100.0, "sigma": 2.0, "xi": -0.1}
@@ -344,9 +353,49 @@ def record_lookup(records: Iterable[CacheRecord]) -> dict[tuple[str, int, int, i
     }
 
 
+def load_blackjax_pooled_reference(blackjax_root: Path) -> tuple[np.ndarray, list[Path]]:
+    """Load the three most recent tau-minimal blackjax SMC-ABC snapshots."""
+    run_dirs = sorted(
+        (path for path in blackjax_root.glob("n_obs_*_seed_*") if path.is_dir()),
+        key=lambda path: path.stat().st_mtime,
+    )[-3:]
+    if len(run_dirs) != 3:
+        raise FileNotFoundError(
+            "expected 3 blackjax SMC-ABC run dirs under "
+            f"{blackjax_root}, got {len(run_dirs)}"
+        )
+
+    arrays: list[np.ndarray] = []
+    snapshots: list[Path] = []
+    for run_dir in run_dirs:
+        tau, snapshot = smallest_tau_snapshot(run_dir)
+        theta = load_theta(snapshot)
+        if theta.ndim != 2 or theta.shape[1] != len(PARAMS):
+            raise ValueError(f"unexpected theta shape {theta.shape}: {snapshot}")
+
+        means = theta.mean(axis=0)
+        if not (
+            50.0 < means[0] < 150.0
+            and 0.5 < means[1] < 4.0
+            and -1.0 < means[2] < 1.0
+        ):
+            raise ValueError(
+                "blackjax theta columns do not match expected "
+                f"(lambda, sigma, xi) magnitudes for {snapshot}: {means}"
+            )
+        if tau != 1.0:
+            raise ValueError(f"expected smallest tau=1 for {snapshot}, got {tau:g}")
+
+        arrays.append(theta)
+        snapshots.append(snapshot)
+
+    return np.concatenate(arrays, axis=0), snapshots
+
+
 def overlay_manifest_and_samples(
     records: list[CacheRecord],
-    smc_root: Path,
+    _smc_root: Path,
+    blackjax_root: Path,
     overlay_seed: int,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
     lookup = record_lookup(records)
@@ -392,59 +441,36 @@ def overlay_manifest_and_samples(
                 }
             )
 
-    smc_path = (
-        smc_root
-        / "npe_n_obs_1000_n_sims_None_seed_1_max_iter_9"
-        / "adaptive_smc_samples.pkl"
+    # ABC-SMC reference samples (single cell). The blackjax theta array is
+    # already ordered as (lambda, sigma, xi), so no ELFI-style reorder is applied.
+    smc_samples, smc_paths = load_blackjax_pooled_reference(blackjax_root)
+    smc_source = "blackjax_smc_abc_pooled_tau1"
+    sample_blocks.append(
+        (
+            {
+                "method": "abc_smc",
+                "source": smc_source,
+                "n": n_obs,
+                "N": "",
+                "N_label": "ABC-SMC",
+                "seed": 1,
+            },
+            smc_samples,
+        )
     )
-    if smc_path.is_file():
-        with smc_path.open("rb") as handle:
-            smc_samples_raw = np.asarray(pickle.load(handle), dtype=float)
-        # Saved ELFI sample order follows the existing notebook for lambda:
-        # col2=lambda. The corresponding parameter order is xi, sigma, lambda.
-        smc_samples = np.column_stack(
-            [smc_samples_raw[:, 2], smc_samples_raw[:, 1], smc_samples_raw[:, 0]]
-        )
-        sample_blocks.append(
-            (
-                {
-                    "method": "abc_smc",
-                    "source": "adaptive_smc_samples.pkl",
-                    "n": n_obs,
-                    "N": "",
-                    "N_label": "ABC-SMC",
-                    "seed": 1,
-                },
-                smc_samples,
-            )
-        )
-        manifest.append(
-            {
-                "method": "abc_smc",
-                "source": "adaptive_smc_samples.pkl",
-                "n": n_obs,
-                "N": "",
-                "N_label": "ABC-SMC",
-                "seed": 1,
-                "has_samples": 1,
-                "sample_count": smc_samples.shape[0],
-                "path": str(smc_path),
-            }
-        )
-    else:
-        manifest.append(
-            {
-                "method": "abc_smc",
-                "source": "adaptive_smc_samples.pkl",
-                "n": n_obs,
-                "N": "",
-                "N_label": "ABC-SMC",
-                "seed": 1,
-                "has_samples": 0,
-                "sample_count": 0,
-                "path": str(smc_path),
-            }
-        )
+    manifest.append(
+        {
+            "method": "abc_smc",
+            "source": smc_source,
+            "n": n_obs,
+            "N": "",
+            "N_label": "ABC-SMC",
+            "seed": 1,
+            "has_samples": 1,
+            "sample_count": smc_samples.shape[0],
+            "path": ";".join(str(path) for path in smc_paths),
+        }
+    )
 
     sample_rows: list[dict[str, object]] = []
     density_rows: list[dict[str, object]] = []
@@ -623,7 +649,8 @@ def write_rerun_note(
 
 def write_outputs(
     records: list[CacheRecord],
-    smc_root: Path,
+    _smc_root: Path,
+    blackjax_root: Path,
     output_dir: Path,
     overlay_seed: int,
 ) -> None:
@@ -636,7 +663,7 @@ def write_outputs(
     bias_summary = bias_summary_rows(bias_seed)
     posterior_bias = posterior_mean_bias_rows(grouped)
     overlay_manifest, overlay_samples, overlay_density = overlay_manifest_and_samples(
-        records, smc_root, overlay_seed
+        records, _smc_root, blackjax_root, overlay_seed
     )
 
     inventory_fields = [
@@ -784,6 +811,11 @@ def write_outputs(
         overlay_density_fields,
         overlay_density,
     )
+    write_csv(
+        output_dir / "posterior_overlay_density_n1000_seed1_with_blackjax_abc.csv",
+        overlay_density_fields,
+        overlay_density,
+    )
     write_rerun_note(output_dir / "stereological_task1_rerun_note.md", inventory, overlay_manifest)
 
     summary = {
@@ -812,6 +844,9 @@ def parse_args() -> argparse.Namespace:
         "--smc-root", type=Path, default=Path("res/stereological_smc_abc")
     )
     parser.add_argument(
+        "--blackjax-root", type=Path, default=Path("res/stereological_blackjax_smc_abc")
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("notebooks/plots/stereological_task1_20260502"),
@@ -825,7 +860,9 @@ def main() -> None:
     records = parse_caches(args.cache_root)
     if not records:
         raise SystemExit(f"no stereological cache records found in {args.cache_root}")
-    write_outputs(records, args.smc_root, args.output_dir, args.overlay_seed)
+    write_outputs(
+        records, args.smc_root, args.blackjax_root, args.output_dir, args.overlay_seed
+    )
     print(f"wrote stereological Task 1 outputs to {args.output_dir}")
 
 

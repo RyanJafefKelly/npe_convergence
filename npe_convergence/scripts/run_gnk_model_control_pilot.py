@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
@@ -24,8 +25,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import jax
+import numpy as np
 import yaml
 
+jax.config.update("jax_enable_x64", True)
+assert jax.config.read("jax_enable_x64")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_ROOT = REPO_ROOT / "res" / "gnk_model_control"
@@ -69,6 +74,20 @@ def run_git(args: list[str], default: str = "unknown") -> str:
 
 def git_dirty() -> bool:
     return bool(run_git(["status", "--porcelain"], default="dirty"))
+
+
+def stable_int(*parts: object) -> int:
+    payload = "|".join(str(part) for part in parts).encode()
+    return int.from_bytes(hashlib.blake2b(payload, digest_size=4).digest(), "big")
+
+
+def rng_for(seed: int, *parts: object):
+    import jax.random as random
+
+    key = random.key(seed)
+    for part in parts:
+        key = random.fold_in(key, stable_int(part))
+    return key
 
 
 def utc_now() -> str:
@@ -278,7 +297,7 @@ def print_dry_run(config: dict[str, Any]) -> None:
     for row in config["dry_run_rows"]:
         mark = "yes" if row["selected"] else "no "
         print(
-            f"{mark:8s} {row['n']:<4d} {row['x']:<4d} {row['N']:<8d} "
+            f"{mark:8s} {int(row['n']):<4d} {str(row['x']):<8s} {int(row['N']):<8d} "
             f"{row['seed']:<5d} {row['method']:<13s} "
             f"{row['simulator']:<25s} {row['paths']['output_dir']}"
         )
@@ -335,9 +354,35 @@ def load_config(path: str) -> dict[str, Any]:
         config = yaml.safe_load(f)
     if config["simulator"] != SIMULATOR:
         raise ValueError(f"unexpected simulator: {config['simulator']}")
-    if int(config["x"]) not in CANDIDATE_X:
+    x_value = config.get("x")
+    if isinstance(x_value, int) or (isinstance(x_value, str) and x_value.isdigit()):
+        if int(x_value) not in CANDIDATE_X:
+            raise ValueError(f"unexpected x: {config['x']}")
+    elif x_value != "n_squared":
         raise ValueError(f"unexpected x: {config['x']}")
+    config.setdefault("git_dirty", git_dirty())
+    config.setdefault("branch", run_git(["branch", "--show-current"]))
+    config.setdefault("dry_run_rows", [resolved_config_row(config)])
     return config
+
+
+def resolved_config_row(config: dict[str, Any]) -> dict[str, Any]:
+    paths = dict(config["expected_outputs"])
+    return {
+        "n": int(config["n"]),
+        "x": config["x"],
+        "N": int(config["N"]),
+        "seed": int(config["observed_seed"]),
+        "method": config["method"],
+        "simulator": config["simulator"],
+        "selected": True,
+        "run_id": config["run_id"],
+        "paths": paths,
+        "exists": {
+            name: (REPO_ROOT / path).exists()
+            for name, path in paths.items()
+        },
+    }
 
 
 def cpu_info() -> dict[str, Any]:
@@ -396,17 +441,59 @@ def save_losses(losses: dict[str, list[float]], output_dir: Path) -> None:
     plt.clf()
 
 
-def _observed_summary(seed: int, n_obs: int):
+def _observed_summary(seed: int, n_obs: int, convention: str = "gaussian"):
     import jax.numpy as jnp
     import jax.random as random
 
     from npe_convergence.examples.gnk import gnk, ss_octile
 
     key = random.key(seed)
-    key, subkey = random.split(key)
+    if convention == "flow":
+        subkey = key
+    elif convention == "gaussian":
+        _, subkey = random.split(key)
+    else:
+        raise ValueError(f"unknown convention: {convention}")
     true_params = jnp.array([3.0, 1.0, 2.0, 0.5])
     z = random.normal(subkey, shape=(n_obs,))
     return jnp.squeeze(ss_octile(jnp.atleast_2d(gnk(z, *true_params))))
+
+
+def _reference_convention(config: dict[str, Any]) -> str:
+    path = str(config.get("nuts_reference_cache_path", ""))
+    if "_conv_flow" in path:
+        return "flow"
+    if "_conv_gaussian" in path:
+        return "gaussian"
+    return "gaussian"
+
+
+def load_reference_samples(path: Path) -> np.ndarray:
+    with path.open("rb") as f:
+        payload = pkl.load(f)
+    if isinstance(payload, dict) and "samples" in payload:
+        samples = np.asarray(payload["samples"], dtype=np.float64)
+        if samples.ndim == 3:
+            return samples.reshape(-1, samples.shape[-1])
+        return samples
+    return np.asarray(payload, dtype=np.float64)
+
+
+def deduplicate(samples: np.ndarray) -> tuple[np.ndarray, int]:
+    unique = np.unique(np.asarray(samples, dtype=np.float64), axis=0)
+    return unique, int(samples.shape[0] - unique.shape[0])
+
+
+def write_config_snapshot(config: dict[str, Any], output_dir: Path) -> None:
+    path = output_dir / "config.yaml"
+    text = yaml.safe_dump(config, sort_keys=False)
+    if path.exists():
+        if path.read_text() != text:
+            raise SystemExit(
+                f"Config snapshot already exists with different content: {rel(path)}"
+            )
+        return
+    path.write_text(text)
 
 
 def _sample_asymptotic_mvn_batch(key, theta_batch, n_obs: int):
@@ -573,6 +660,7 @@ def run_pilot(config: dict[str, Any]) -> int:
     import jax.numpy as jnp
     import jax.random as random
     import numpy as np
+    import numpyro  # type: ignore
     import numpyro.distributions as dist  # type: ignore
     from jax.scipy.special import expit, logit
 
@@ -608,6 +696,14 @@ def run_pilot(config: dict[str, Any]) -> int:
         "epochs_per_second": None,
         "cpu_info": cpu_info(),
         "gpu_info": gpu_info(),
+        "environment": {
+            "python": sys.version.split()[0],
+            "jax_version": jax.__version__,
+            "jax_enable_x64": bool(jax.config.read("jax_enable_x64")),
+            "numpyro_version": numpyro.__version__,
+            "git_commit": run_git(["rev-parse", "HEAD"]),
+            "git_dirty": git_dirty(),
+        },
         "peak_memory_kb": None,
         "peak_memory_source": "resource.getrusage(RUSAGE_SELF).ru_maxrss",
         "exit_status": None,
@@ -620,20 +716,29 @@ def run_pilot(config: dict[str, Any]) -> int:
         seed = int(config["observed_seed"])
         n_obs = int(config["n"])
         n_sims = int(config["N"])
-        key = random.key(seed)
-        x_obs = _observed_summary(seed, n_obs)
+        simulation_seed = int(config.get("simulation_seed", seed))
+        training_seed = int(config.get("training_seed", simulation_seed))
+        posterior_seed = int(config.get("posterior_sampling_seed", seed))
+        convention = _reference_convention(config)
+        x_obs = _observed_summary(seed, n_obs, convention=convention)
+        write_config_snapshot(config, output_dir)
 
         nuts_cache = REPO_ROOT / config["nuts_reference_cache_path"]
         if not nuts_cache.exists():
             raise FileNotFoundError(f"Required read-only NUTS cache is missing: {rel(nuts_cache)}")
-        with nuts_cache.open("rb") as f:
-            true_posterior_samples = pkl.load(f)
+        true_posterior_samples = load_reference_samples(nuts_cache)
 
-        key, subkey = random.split(key)
-        theta_bounded = dist.Uniform(1e-6, 10 - 1e-6).sample(subkey, (n_sims, D_THETA))
+        theta_key = rng_for(
+            training_seed, "model_control", n_obs, seed, "theta_prior", config["simulator"]
+        )
+        theta_bounded = dist.Uniform(1e-6, 10 - 1e-6).sample(
+            theta_key, (n_sims, D_THETA)
+        )
 
         sim_start = time.perf_counter()
-        key, subkey = random.split(key)
+        subkey = rng_for(
+            simulation_seed, "model_control", n_obs, seed, training_seed, "summaries"
+        )
         summaries, simulator_diagnostics, theta_bounded = sample_asymptotic_mvn_summaries(
             subkey,
             theta_bounded,
@@ -670,7 +775,7 @@ def run_pilot(config: dict[str, Any]) -> int:
         x_obs_std = (x_obs - summary_mean) / summary_std
 
         train_cfg = config["train_config"]
-        key, subkey = random.split(key)
+        subkey = rng_for(training_seed, "model_control", n_obs, seed, "model_init")
         model = ConditionalGaussianNPE(
             d_summary=D_S,
             d_theta=D_THETA,
@@ -685,7 +790,7 @@ def run_pilot(config: dict[str, Any]) -> int:
             val_frac=float(train_cfg["val_frac"]),
         )
         train_start = time.perf_counter()
-        key, subkey = random.split(key)
+        subkey = rng_for(training_seed, "model_control", n_obs, seed, "fit")
         model, losses = fit(model, theta_u, summaries_std, key=subkey, config=fit_config)
         metadata["training_time_seconds"] = time.perf_counter() - train_start
         epochs = len(losses["train"])
@@ -717,7 +822,9 @@ def run_pilot(config: dict[str, Any]) -> int:
         )
 
         sample_start = time.perf_counter()
-        key, subkey = random.split(key)
+        subkey = rng_for(
+            posterior_seed, "model_control", n_obs, seed, training_seed, "posterior"
+        )
         posterior_u = sample(model, x_obs_std, 10_000, key=subkey)
         posterior_eta = posterior_u * theta_std + theta_mean
         posterior_theta = expit(posterior_eta) * 10
@@ -732,16 +839,38 @@ def run_pilot(config: dict[str, Any]) -> int:
             pkl.dump(np.asarray(posterior_theta), f)
 
         n_metric = 2000
-        key, subkey = random.split(key)
-        idx_npe = random.permutation(subkey, posterior_theta.shape[0])[:n_metric]
-        key, subkey = random.split(key)
-        idx_true = random.permutation(subkey, true_posterior_samples.shape[0])[:n_metric]
-        ps_thin = posterior_theta[idx_npe]
-        ts_thin = true_posterior_samples[idx_true]
+        posterior_unique, ps_duplicates = deduplicate(np.asarray(posterior_theta))
+        true_unique, ref_duplicates = deduplicate(true_posterior_samples)
+        if posterior_unique.shape[0] < n_metric or true_unique.shape[0] < n_metric:
+            raise RuntimeError(
+                "not enough unique posterior or reference samples for 2000-sample KL"
+            )
+        subkey = rng_for(
+            posterior_seed, "model_control", n_obs, seed, training_seed, "metric_npe"
+        )
+        idx_npe = np.asarray(random.permutation(subkey, posterior_unique.shape[0])[:n_metric])
+        subkey = rng_for(
+            posterior_seed, "model_control", n_obs, seed, training_seed, "metric_ref"
+        )
+        idx_true = np.asarray(random.permutation(subkey, true_unique.shape[0])[:n_metric])
+        ps_thin = jnp.asarray(posterior_unique[idx_npe])
+        ts_thin = jnp.asarray(true_unique[idx_true])
         kl = kullback_leibler(ts_thin, ps_thin)
         lengthscale = median_heuristic(jnp.vstack([ts_thin, ps_thin]))
         mmd = unbiased_mmd(ts_thin, ps_thin, lengthscale)
-        metrics = {"kl_theta_knn_2000": float(kl), "mmd_theta_2000": float(mmd)}
+        metrics = {
+            "kl_theta_knn_2000": float(kl),
+            "mmd_theta_2000": float(mmd),
+            "n_metric": n_metric,
+            "reference_duplicates_removed": int(ref_duplicates),
+            "posterior_duplicates_removed": int(ps_duplicates),
+            "reference_path": rel(nuts_cache),
+            "reference_convention": convention,
+            "observed_seed": seed,
+            "training_seed": training_seed,
+            "simulation_seed": simulation_seed,
+            "posterior_sampling_seed": posterior_seed,
+        }
         (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True))
 
         metadata["exit_status"] = 0
@@ -789,21 +918,60 @@ def evaluate(config: dict[str, Any]) -> dict[str, Any]:
     if DECOMP_D_THETA != D_THETA or DECOMP_D_TOTAL != D_TOTAL:
         raise RuntimeError("Decomposition constants do not match GNK octile control config.")
     output_dir = REPO_ROOT / config["output_dir"]
+    gaussian_path = output_dir / "gaussian_npe_u_posterior.npz"
     sample_path = output_dir / "posterior_samples_10k.npz"
     posterior_pkl = output_dir / "posterior_samples.pkl"
+
+    def require_shape(name: str, array: np.ndarray, shape: tuple[int, ...]) -> None:
+        if array.shape != shape:
+            raise ValueError(f"{name} has shape {array.shape}, expected {shape}")
+        if not np.isfinite(array).all():
+            raise ValueError(f"{name} contains NaN or Inf")
+
+    if not gaussian_path.exists():
+        raise FileNotFoundError(f"Missing saved Gaussian posterior: {rel(gaussian_path)}")
+    with np.load(gaussian_path) as posterior:
+        mu_u = np.asarray(posterior["mu_u"], dtype=np.float64)
+        cov_u = np.asarray(posterior["cov_u"], dtype=np.float64)
+        theta_unbounded_mean = np.asarray(
+            posterior["theta_unbounded_mean"], dtype=np.float64
+        )
+        theta_unbounded_std = np.asarray(
+            posterior["theta_unbounded_std"], dtype=np.float64
+        )
+    require_shape("mu_u", mu_u, (D_THETA,))
+    require_shape("cov_u", cov_u, (D_THETA, D_THETA))
+    require_shape("theta_unbounded_mean", theta_unbounded_mean, (D_THETA,))
+    require_shape("theta_unbounded_std", theta_unbounded_std, (D_THETA,))
+    if np.any(theta_unbounded_std <= 0):
+        raise ValueError("theta_unbounded_std must be positive")
+
     if sample_path.exists():
         with np.load(sample_path) as data:
-            if "u" in data:
-                q_u = np.asarray(data["u"], dtype=np.float64)
-            else:
-                q_theta = np.asarray(data["theta"], dtype=np.float64)
-                q_u, _ = theta_to_u_affine_invariant(q_theta)
+            q_theta = np.asarray(data["theta"], dtype=np.float64)
+            q_u_saved = np.asarray(data["u"], dtype=np.float64)
+            q_eta = np.asarray(data["eta"], dtype=np.float64)
+        require_shape("posterior_samples.theta", q_theta, (10_000, D_THETA))
+        require_shape("posterior_samples.u", q_u_saved, (10_000, D_THETA))
+        require_shape("posterior_samples.eta", q_eta, (10_000, D_THETA))
     elif posterior_pkl.exists():
         with posterior_pkl.open("rb") as f:
             q_theta = np.asarray(pkl.load(f), dtype=np.float64)
-        q_u, _ = theta_to_u_affine_invariant(q_theta)
+        q_eta, _ = theta_to_u_affine_invariant(q_theta)
+        q_u_saved = None
     else:
         raise FileNotFoundError(f"Missing posterior samples: {rel(sample_path)}")
+
+    eta_from_theta, theta_clip_count = theta_to_u_affine_invariant(q_theta)
+    eta_theta_max_abs_diff = float(np.max(np.abs(q_eta - eta_from_theta)))
+    eta_u_max_abs_diff = None
+    if q_u_saved is not None:
+        eta_from_u = q_u_saved * theta_unbounded_std + theta_unbounded_mean
+        eta_u_max_abs_diff = float(np.max(np.abs(q_eta - eta_from_u)))
+
+    scale = np.diag(theta_unbounded_std)
+    direct_eta_mean = mu_u * theta_unbounded_std + theta_unbounded_mean
+    direct_eta_cov = scale @ cov_u @ scale
 
     oracle = compute_oracle_moments(
         REPO_ROOT / "res" / "gnk",
@@ -813,18 +981,36 @@ def evaluate(config: dict[str, Any]) -> dict[str, Any]:
     if oracle is None:
         raise FileNotFoundError("Missing NUTS cache for evaluation.")
 
-    q_mean = q_u.mean(axis=0)
-    q_cov = np.cov(q_u, rowvar=False)
+    q_mean = q_eta.mean(axis=0)
+    q_cov = np.cov(q_eta, rowvar=False)
     delta_total, delta_mean, delta_cov, oracle_min_eig, q_min_eig = (
         gaussian_kl_decomp_from_moments(oracle.u_mean, oracle.u_cov, q_mean, q_cov)
     )
+    direct_total, direct_mean, direct_cov, _, direct_q_min_eig = (
+        gaussian_kl_decomp_from_moments(
+            oracle.u_mean,
+            oracle.u_cov,
+            direct_eta_mean,
+            direct_eta_cov,
+        )
+    )
     self_kl = self_consistency_kl_u(
-        q_u,
+        q_eta,
         q_mean,
         q_cov,
         seed=int(config["observed_seed"]) + int(config["N"]) + 30_000,
         n_metric=2000,
     )
+    self_direct_kl = self_consistency_kl_u(
+        q_eta,
+        direct_eta_mean,
+        direct_eta_cov,
+        seed=int(config["observed_seed"]) + int(config["N"]) + 31_000,
+        n_metric=2000,
+    )
+    _, _, sample_cov_min_eig = decomp.stable_cov_matrix(q_cov)
+    _, _, direct_cov_eta_min_eig = decomp.stable_cov_matrix(direct_eta_cov)
+
     result = {
         "task": "gnk-model-control-pilot-u-space-decomposition",
         "created_at_utc": utc_now(),
@@ -835,7 +1021,7 @@ def evaluate(config: dict[str, Any]) -> dict[str, Any]:
         "simulator": config["simulator"],
         "n": int(config["n"]),
         "N": int(config["N"]),
-        "x": int(config["x"]),
+        "x": config["x"],
         "seed": int(config["observed_seed"]),
         "K_theta_star": oracle.K_theta_oracle,
         "K_u_star": oracle.K_u_oracle,
@@ -843,15 +1029,60 @@ def evaluate(config: dict[str, Any]) -> dict[str, Any]:
         "Delta_N_u": delta_total,
         "Delta_N_u_mean_component": delta_mean,
         "Delta_N_u_covariance_component": delta_cov,
+        "Delta_theta_total": delta_total + oracle.coord_offset,
         "self_consistency_kl_reconstructed_Qhat_N_u": self_kl,
-        "oracle_min_eig_u": oracle_min_eig,
-        "qhat_min_eig_u": q_min_eig,
+        "direct_saved_gaussian_reconstruction": {
+            "Delta_N_u": direct_total,
+            "Delta_N_u_mean_component": direct_mean,
+            "Delta_N_u_covariance_component": direct_cov,
+            "Delta_theta_total": direct_total + oracle.coord_offset,
+            "self_consistency_kl_saved_Gaussian_against_saved_eta_samples": self_direct_kl,
+            "qhat_min_eig_eta": direct_q_min_eig,
+            "cov_eta_min_eig": direct_cov_eta_min_eig,
+        },
+        "coordinate": "eta = logit(theta / 10), affine-equivalent to standardized u",
+        "qhat_source": "posterior_samples_10k.npz eta sample moments",
+        "oracle_min_eig_eta": oracle_min_eig,
+        "qhat_min_eig_eta": q_min_eig,
+        "sample_eta_cov_min_eig": sample_cov_min_eig,
+        "schema_checks": {
+            "posterior_theta_shape": list(q_theta.shape),
+            "posterior_eta_shape": list(q_eta.shape),
+            "posterior_u_shape": list(q_u_saved.shape) if q_u_saved is not None else None,
+            "mu_u_shape": list(mu_u.shape),
+            "cov_u_shape": list(cov_u.shape),
+            "theta_clip_count_when_recomputing_eta": int(theta_clip_count),
+            "eta_from_theta_max_abs_diff": eta_theta_max_abs_diff,
+            "eta_from_saved_u_max_abs_diff": eta_u_max_abs_diff,
+            "finite_decomposition_components": bool(
+                np.isfinite(
+                    [
+                        oracle.K_theta_oracle,
+                        oracle.K_u_oracle,
+                        oracle.coord_offset,
+                        delta_total,
+                        delta_mean,
+                        delta_cov,
+                        direct_total,
+                        direct_mean,
+                        direct_cov,
+                        self_kl,
+                        self_direct_kl,
+                    ]
+                ).all()
+            ),
+            "covariance_component_nonnegative_with_tolerance": bool(
+                delta_cov >= -1e-8 and direct_cov >= -1e-8
+            ),
+        },
         "nuts_cache_path": rel(oracle.nuts_path),
         "posterior_sample_path": rel(sample_path if sample_path.exists() else posterior_pkl),
+        "gaussian_npe_u_posterior_path": rel(gaussian_path),
         "note": (
             "Delta_N,u is native u-space Gaussian-NPE error. This output uses "
-            "the reviewed coordinate-aware decomposition conventions and should "
-            "not be compared to smoke-test metrics.json KL/MMD."
+            "the reviewed coordinate-aware eta convention, which is affine-equivalent "
+            "to standardized u for exact Gaussian-Gaussian terms. Do not compare this "
+            "to smoke-test metrics.json KL/MMD."
         ),
     }
     output_path = output_dir / "u_space_decomposition.json"

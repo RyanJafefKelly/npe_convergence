@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -39,6 +40,12 @@ COMPAT_COLUMNS = [
     "delta0",
     "rows",
     "complete_rows",
+    "status_complete_rows",
+    "nonfinite_kl_status_rows",
+    "missing_rows",
+    "timed_out_rows",
+    "partial_training_only_rows",
+    "bad_shape_rows",
     "shape_ok_rows",
     "finite_kl_rows",
     "infinite_kl_rows",
@@ -57,6 +64,20 @@ COMPAT_COLUMNS = [
     "mmd_q75",
     "mmd_max",
 ]
+
+PBS_LOG_RE = re.compile(
+    r"^ma2_delta1_refresh\.(?P<stream>[eo])(?P<job_id>\d+)\.(?P<array_index>\d+)$"
+)
+EXIT_RE = re.compile(r"Exit_status\s*[:=]\s*(-?\d+)")
+WALLTIME_RE = re.compile(r"resources_used\.walltime\s*=\s*([0-9:]+)")
+KILLED_WALLTIME_RE = re.compile(
+    r"walltime\s+([0-9]+)\s+exceeded\s+limit\s+([0-9]+)", re.IGNORECASE
+)
+PARTIAL_ARTIFACT_NAMES = {
+    "config.json",
+    "standardisation.npz",
+    "validation_curve.csv",
+}
 
 
 def rel(path: Path) -> str:
@@ -131,10 +152,102 @@ def load_metrics(path: Path, method: str) -> tuple[float, float, str]:
     return kl, mmd, "ok"
 
 
+def read_log_tail(path: Path, max_bytes: int = 65536) -> str:
+    try:
+        with path.open("rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - max_bytes))
+            return fh.read().decode(errors="replace")
+    except OSError:
+        return ""
+
+
+def collect_pbs_logs() -> dict[int, dict[str, str]]:
+    """Collect lightweight metadata from PBS stdout/stderr files if present."""
+    by_array: dict[int, dict[str, object]] = {}
+    for path in REPO_ROOT.glob("ma2_delta1_refresh.[eo]*.*"):
+        match = PBS_LOG_RE.match(path.name)
+        if not match:
+            continue
+        array_index = int(match.group("array_index"))
+        stream = match.group("stream")
+        job_id = match.group("job_id")
+        entry = by_array.setdefault(
+            array_index,
+            {
+                "job_ids": set(),
+                "stderr_paths": [],
+                "stdout_paths": [],
+                "exit_statuses": [],
+                "walltimes": [],
+                "text": "",
+            },
+        )
+        entry["job_ids"].add(job_id)
+        if stream == "e":
+            entry["stderr_paths"].append(rel(path))
+        else:
+            entry["stdout_paths"].append(rel(path))
+        text = read_log_tail(path)
+        entry["text"] += "\n" + text
+        entry["exit_statuses"].extend(EXIT_RE.findall(text))
+        entry["walltimes"].extend(WALLTIME_RE.findall(text))
+        entry["walltimes"].extend(
+            f"{used}s/{limit}s" for used, limit in KILLED_WALLTIME_RE.findall(text)
+        )
+
+    parsed: dict[int, dict[str, str]] = {}
+    for array_index, entry in by_array.items():
+        text = str(entry["text"])
+        text_lower = text.lower()
+        reason = ""
+        if "walltime" in text_lower and "exceeded" in text_lower:
+            reason = "walltime"
+        elif "killed" in text_lower:
+            reason = "killed"
+        elif "traceback" in text_lower:
+            reason = "python_error"
+        elif "file exists" in text_lower or "fail-if-output-exists" in text_lower:
+            reason = "output_exists"
+        elif entry["exit_statuses"]:
+            last_exit = str(entry["exit_statuses"][-1])
+            if last_exit not in {"0", ""}:
+                reason = f"exit_{last_exit}"
+
+        parsed[array_index] = {
+            "pbs_job_id": ";".join(sorted(entry["job_ids"])),
+            "pbs_exit_status": ";".join(str(v) for v in entry["exit_statuses"]),
+            "pbs_walltime": ";".join(str(v) for v in entry["walltimes"]),
+            "pbs_reason": reason,
+            "pbs_stdout": ";".join(entry["stdout_paths"]),
+            "pbs_stderr": ";".join(entry["stderr_paths"]),
+        }
+    return parsed
+
+
+def partial_files(output_dir: Path, delta_dir: Path) -> list[str]:
+    files: list[Path] = []
+    for parent in (output_dir, delta_dir):
+        if not parent.is_dir():
+            continue
+        for path in parent.iterdir():
+            if path.is_file() and (
+                path.name in PARTIAL_ARTIFACT_NAMES
+                or path.suffix in {".json", ".csv", ".npz", ".txt"}
+            ):
+                files.append(path)
+    return sorted({rel(path) for path in files})
+
+
 def audit_rows(manifest: pd.DataFrame) -> pd.DataFrame:
+    pbs_logs = collect_pbs_logs()
     rows: list[dict[str, object]] = []
-    for _, row in manifest.iterrows():
+    for manifest_index, row in manifest.iterrows():
+        pbs_array_index = int(manifest_index) + 1
         method = str(row["method"])
+        output_dir = REPO_ROOT / str(row["output_dir"])
+        delta_dir = REPO_ROOT / str(row["delta_dir"])
         kl_path = REPO_ROOT / str(row["kl_txt"])
         mmd_path = REPO_ROOT / str(row["mmd_txt"])
         metrics_path = REPO_ROOT / str(row["metrics_json"])
@@ -155,11 +268,27 @@ def audit_rows(manifest: pd.DataFrame) -> pd.DataFrame:
         required_paths = [kl_path, mmd_path, metrics_path, reference_path, posterior_path]
         missing = [rel(path) for path in required_paths if not path.is_file()]
         complete = not missing and shape_ok
+        partial = partial_files(output_dir, delta_dir)
+        pbs = pbs_logs.get(
+            pbs_array_index,
+            {
+                "pbs_job_id": "",
+                "pbs_exit_status": "",
+                "pbs_walltime": "",
+                "pbs_reason": "",
+                "pbs_stdout": "",
+                "pbs_stderr": "",
+            },
+        )
 
-        if not missing and not shape_ok:
-            status = "bad_shape"
+        if missing and partial:
+            status = "partial_training_only"
+        elif missing and pbs["pbs_reason"] == "walltime":
+            status = "timed_out"
         elif missing:
             status = "missing"
+        elif not shape_ok:
+            status = "bad_shape"
         elif not np.isfinite(float(kl)):
             status = "nonfinite_kl"
         elif not np.isfinite(float(mmd)):
@@ -175,11 +304,20 @@ def audit_rows(manifest: pd.DataFrame) -> pd.DataFrame:
                 "budget_label": row["budget_label"],
                 "seed": int(row["seed"]),
                 "delta0": float(row["delta0"]),
+                "pbs_array_index": pbs_array_index,
+                "pbs_job_id": pbs["pbs_job_id"],
+                "pbs_exit_status": pbs["pbs_exit_status"],
+                "pbs_walltime": pbs["pbs_walltime"],
+                "pbs_reason": pbs["pbs_reason"],
+                "pbs_stdout": pbs["pbs_stdout"],
+                "pbs_stderr": pbs["pbs_stderr"],
                 "output_dir": row["output_dir"],
                 "delta_dir": row["delta_dir"],
                 "complete": complete,
                 "status": status,
                 "missing_files": ";".join(missing),
+                "partial_files_present": bool(partial),
+                "partial_files": ";".join(partial),
                 "kl": float(kl),
                 "mmd": float(mmd),
                 "kl_finite": bool(np.isfinite(float(kl))),
@@ -212,6 +350,7 @@ def group_summary(audit: pd.DataFrame) -> pd.DataFrame:
         kl_stats = finite_quantiles(finite_kl)
         mmd_stats = finite_quantiles(finite_mmd)
         total = int(len(group))
+        status_counts = group["status"].value_counts()
         rows.append(
             {
                 "method": method,
@@ -221,6 +360,14 @@ def group_summary(audit: pd.DataFrame) -> pd.DataFrame:
                 "delta0": float(delta0),
                 "rows": total,
                 "complete_rows": int(group["complete"].astype(bool).sum()),
+                "status_complete_rows": int(status_counts.get("complete", 0)),
+                "nonfinite_kl_status_rows": int(status_counts.get("nonfinite_kl", 0)),
+                "missing_rows": int(status_counts.get("missing", 0)),
+                "timed_out_rows": int(status_counts.get("timed_out", 0)),
+                "partial_training_only_rows": int(
+                    status_counts.get("partial_training_only", 0)
+                ),
+                "bad_shape_rows": int(status_counts.get("bad_shape", 0)),
                 "shape_ok_rows": int(group["shape_ok"].astype(bool).sum()),
                 "finite_kl_rows": int(finite_kl.size),
                 "infinite_kl_rows": int(inf_kl.size),
@@ -244,27 +391,65 @@ def group_summary(audit: pd.DataFrame) -> pd.DataFrame:
 
 
 def comparison_note(summary: pd.DataFrame, audit: pd.DataFrame) -> str:
-    complete = int(audit["complete"].astype(bool).sum())
+    file_complete = int(audit["complete"].astype(bool).sum())
+    finite_complete = int((audit["status"] == "complete").sum())
     total = int(len(audit))
-    lines = [
-        f"The exact delta0=1.0 refresh currently has {complete} complete rows out of {total} manifest rows.",
+    status_counts = audit["status"].value_counts()
+    gaussian = audit[audit["method"] == "gaussian_npe"]
+    flow = audit[audit["method"] == "flow_npe"]
+    flow_25m = audit[
+        (audit["method"] == "flow_npe")
+        & (audit["n_obs"] == 5000)
+        & (audit["n_sims"] == 25_000_000)
     ]
-    if complete < total:
+    gaussian_25m = audit[
+        (audit["method"] == "gaussian_npe")
+        & (audit["n_obs"] == 5000)
+        & (audit["n_sims"] == 25_000_000)
+    ]
+
+    lines = [
+        "# MA(2) delta0=1 refresh note",
+        "",
+        f"The exact delta0=1.0 refresh has {file_complete} file/shape-complete rows out of {total} manifest rows.",
+        f"Of those, {finite_complete} rows have finite KL and finite MMD and are classified as complete scientific rows.",
+        "Status counts: "
+        + ", ".join(f"{k}={int(v)}" for k, v in status_counts.items())
+        + ".",
+        f"Gaussian-NPE produced complete files for {int(gaussian['complete'].astype(bool).sum())}/{len(gaussian)} rows; "
+        f"{int((gaussian['status'] == 'complete').sum())}/{len(gaussian)} have finite KL.",
+        f"Flow-NPE produced complete files for {int(flow['complete'].astype(bool).sum())}/{len(flow)} rows; "
+        f"{int((flow['status'] == 'complete').sum())}/{len(flow)} have finite KL.",
+    ]
+    if not gaussian_25m.empty:
         lines.append(
-            "The exact-compatible comparison should be treated as incomplete until the full PBS grid or selected repair runs finish."
+            "Gaussian-NPE at n_obs=5000, N=25M produced complete files for "
+            f"{int(gaussian_25m['complete'].astype(bool).sum())}/{len(gaussian_25m)} seeds; "
+            f"{int(gaussian_25m['kl_finite'].astype(bool).sum())}/{len(gaussian_25m)} have finite KL, "
+            f"{int(np.isinf(pd.to_numeric(gaussian_25m['kl'], errors='coerce')).sum())}/{len(gaussian_25m)} have infinite KL, "
+            f"and {int(gaussian_25m['mmd_finite'].astype(bool).sum())}/{len(gaussian_25m)} have finite MMD."
         )
-    if complete:
-        sub = summary[
-            (summary["n_obs"] == 100)
-            & (summary["budget_label"] == "N=n")
-            & (summary["finite_kl_rows"] > 0)
-        ].sort_values("method")
+    if not flow_25m.empty:
+        flow_25m_counts = flow_25m["status"].value_counts()
+        lines.append(
+            "Flow-NPE at n_obs=5000, N=25M has "
+            f"{int((flow_25m['status'] == 'complete').sum())}/{len(flow_25m)} complete seeds; "
+            + ", ".join(f"{k}={int(v)}" for k, v in flow_25m_counts.items())
+            + "."
+        )
+        lines.append(
+            "Those 25M flow rows should be treated as timed-out/partial-training-only operational failures, not as scientific KL values."
+        )
+    if finite_complete:
+        sub = summary[(summary["n_obs"] == 1000) & (summary["finite_kl_rows"] > 0)].sort_values(
+            ["method", "n_sims"]
+        )
         parts = [
-            f"{row.method} KL median {row.finite_kl_median:.3f}"
+            f"{row.method} {row.budget_label} KL median {row.finite_kl_median:.3f}"
             for row in sub.itertuples()
         ]
         if parts:
-            lines.append("In the completed pilot cell group, " + ", ".join(parts) + ".")
+            lines.append("At n_obs=1000, " + ", ".join(parts) + ".")
 
     if COMPAT_FLOW_PATH.is_file():
         flow = pd.read_csv(COMPAT_FLOW_PATH)

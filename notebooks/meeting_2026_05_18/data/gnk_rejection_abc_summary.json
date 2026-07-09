@@ -1,0 +1,22 @@
+{
+  "acceptance": 0.01,
+  "bsl_unique_kl": 0.0244841695430271,
+  "kl_npe_to_reference_value": 0.8038086011697448,
+  "kl_reference_to_npe_value": 0.8095820876425189,
+  "max_marginal_shift": 0.7909604005159304,
+  "max_shift_parameter": "g",
+  "mmd_value": 0.071780657074068,
+  "n_keep": 100000,
+  "n_obs": 1000,
+  "n_pool": 10000000,
+  "robust_canonical_kl": 1.3688184882348922,
+  "runtime_seconds": 1717.2933982089999,
+  "seed": 0,
+  "selection_seconds": 5.233302791999449,
+  "simulation_seconds": 1385.5036810829997,
+  "status": "complete",
+  "stop_reason": "patience",
+  "train_epochs": 646,
+  "training_seconds": 324.1699810830005,
+  "vanilla_canonical_kl": 4.704704115510156
+}

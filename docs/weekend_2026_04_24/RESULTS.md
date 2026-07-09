@@ -152,9 +152,44 @@ explicit review and decision using this calibration result.
 - Recommendation for full array: operationally, x=50 appears feasible for individual jobs under the tested 47h/64GB PBS request because this job completed in about 6.5h and used about 1.7GB RSS. A full high-budget array should still wait for explicit review of queue cost, desired x grid, and whether to run x=25/x=50 only before larger x values.
 - Note: no full high-budget array was submitted.
 
+## HPC Calibration u-Space Evaluation
+
+Status: completed. The completed n=500, x=50, N=3,025,000, seed-88
+empirical-GNK Gaussian-NPE calibration passes the operational u-space
+decomposition format and numerical sanity gate.
+
+- Command: `python scripts/evaluate_gnk_hpc_calibration_u_space.py --output-prefix gnk_hpc_calibration_seed88_u_space_eval_20260426T005408Z`
+- Created at: `2026-04-26T00:55:35.455409+00:00`.
+- Run-time commit hash: `8bbbf4e`; the worktree was dirty at runtime because of pre-existing local changes plus this task's new evaluator/docs/output files.
+- Reviewed decomposition convention: `scripts/compute_gnk_u_space_kl_decomp.py`.
+- Calibration inputs:
+  - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/gaussian_npe_u_posterior.npz`
+  - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/posterior_samples_10k.npz`
+  - `res/gnk/nuts_cache_v2_n_obs_500_seed_88.pkl`
+- Output paths:
+  - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/evaluation/gnk_hpc_calibration_seed88_u_space_eval_20260426T005408Z.json`
+  - `res/gnk_hpc_calibration/gnk_gaussian_npe_n500_x50_seed88_20260425T065035Z/evaluation/gnk_hpc_calibration_seed88_u_space_eval_20260426T005408Z.csv`
+- Schema checks: required files exist; `gaussian_npe_u_posterior.npz` has `mu_u` shape `(4,)` and `cov_u` shape `(4,4)`; `posterior_samples_10k.npz` has `theta`, `u`, and `eta` arrays of shape `(10000,4)`; all required arrays are finite.
+- Coordinate reconstruction checks: recomputing eta from saved theta differs from saved eta by max absolute difference `2.19e-7`; reconstructing eta from saved standardized u differs by `2.71e-7`; reconstructing theta from eta differs by `5.43e-7`. No theta clipping occurred when recomputing eta from the saved samples.
+- Covariance checks: direct saved standardized-u covariance min eigenvalue `6.61e-5`; direct eta covariance min eigenvalue `2.18e-4`; saved eta sample covariance min eigenvalue `2.22e-4`.
+- Reviewed sample-moment decomposition, matching the aggregate script's saved-sample convention:
+  - `K_theta^* = 0.09305122348924681`
+  - `K_u^* = 0.250866626549176`
+  - `coord_offset = 0.1578154030599292`
+  - `Delta_N,u = 2.074183110746632`
+  - `Delta_N,u_mean = 0.46664382486125144`
+  - `Delta_N,u_cov = 1.6075392858853803`
+  - self-consistency KL for reconstructed `Qhat_N,u`: `0.004333260890615903`
+- Direct saved Gaussian reconstruction check: converting `mu_u,cov_u` from standardized u back to eta gives `Delta_N,u = 2.0726844397840067`, with mean component `0.4631751500270533` and covariance component `1.6095092897569536`. The KL from the sample-moment Gaussian to the direct saved Gaussian is `0.00077041636015585`, and the reverse KL is `0.0007609006799080968`.
+- Gate status: `schema_compatible=true`, `finite_sane_decomposition=true`, `passes_operational_evaluation_gate=true`.
+- Cache access: read-only for the NUTS cache and calibration output inputs; no cache files were overwritten.
+- Neutral interpretation: this run is now comparable under the reviewed native u-space Gaussian-NPE diagnostic. The result is an operational pass and a high-budget single-seed diagnostic; `Delta_N,u` is not a pure BvM residual and should not be conflated with the raw `metrics.json` theta-space KL/MMD.
+- Recommended next step: prepare the bounded empirical-GNK Gaussian-NPE dry-run only, with n=500, x in `{25,50}`, seeds `0:100`, a fresh `res/gnk_high_budget/` namespace, and explicit reuse or exclusion of this x=50 seed-88 output.
+
 ## gnk_model Simulator-Control Pilot
 
-Status: prepared; not submitted from this non-HPC environment.
+Status: retry output copied locally and evaluated through the reviewed
+u-space decomposition.
 
 Prepared a guarded Gaussian-NPE simulator-control pilot in which training pairs
 are generated as `theta_i ~ prior` and
@@ -197,10 +232,61 @@ path.
 - Expected stdout/stderr logs: `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/logs/stdout.log` and `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/logs/stderr.log`.
 - Dry-run collision status: selected runtime outputs did not exist at prepare time; the selected output directory and config exist after preparation.
 - Smoke-test result after the retry fix: generated summaries had shape `(8, 7)` and finite values. The simulator now uses the same `1e-6` diagonal jitter convention as `gnk_model`; rare prior-tail covariance failures are resampled and counted in `invalid_covariance_*` diagnostics.
-- Submission status: no job submitted; no full array submitted.
+- Retry submission status: completed on HPC job `20371081.aqua`; no full array
+  submitted.
 - Cache status: empirical GNK caches were not overwritten.
 - Observed-summary caveat: the NUTS cache path records posterior samples; it does not provide an independent observed-summary file in the prepared output. The control config records the regenerated observed-summary convention, and the HPC preflight should verify the seed-88 NUTS cache exists before submission.
-- Interpretation: pending. Do not compare `metrics.json` KL/MMD to the reviewed decomposition table. Scientific comparison requires the post-run `u_space_decomposition.json`, and the empirical-GNK high-budget calibration still needs the same reviewed u-space evaluation before any apples-to-apples interpretation.
+- Raw `metrics.json` caveat: do not compare raw theta-space `metrics.json`
+  KL/MMD directly to the reviewed decomposition table.
+
+Retry completion:
+
+- Job id: `20371081.aqua`.
+- Exit status: 0.
+- Start/end: `2026-04-25T23:53:13Z` to `2026-04-26T09:15:23Z`.
+- Wall time: 33,730.032s, of which simulation took 618.066s and training
+  took 33,093.743s.
+- Peak memory: 1,961,852 KB.
+- Simulator diagnostics: `simulations=3025000`, `batches=3025`,
+  `all_summaries_finite=true`, `invalid_covariance_initial_count=4253`,
+  `invalid_covariance_resample_count=4258`,
+  `invalid_covariance_final_count=0`, and
+  `min_cov_eig_after_jitter=4.918336671266843e-08`.
+- Raw theta metrics: `kl_theta_knn_2000=2.518227447678887`,
+  `mmd_theta_2000=0.27225035429000854`; these are recorded only as raw
+  run diagnostics.
+
+Reviewed u-space evaluation:
+
+- Evaluation output: `res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/u_space_decomposition.json`.
+- Evaluation command: `python npe_convergence/scripts/run_gnk_model_control_pilot.py --evaluate --config res/gnk_model_control/gnk_asymptotic_mvn_gaussian_npe_n500_x50_seed88_20260426T000000Z_retry1/config.yaml`.
+- Evaluation convention: saved posterior `eta = logit(theta / 10)` sample
+  moments, matching the reviewed affine-equivalent u-space convention. The
+  evaluator was corrected to avoid comparing standardized training `u`
+  directly against oracle eta moments.
+- Oracle gate: `K_theta^*=0.09305122348924681`,
+  `K_u^*=0.250866626549176`, `coord_offset=0.1578154030599292`.
+- Model-control residual: `Delta_N,u=2.130124964569709`, with mean component
+  `0.47387380400150214` and covariance component
+  `1.6562511605682069`.
+- Direct saved-Gaussian reconstruction: `Delta_N,u=2.1160601846672464`,
+  with mean component `0.46445925101469354` and covariance component
+  `1.6516009336525528`.
+- Schema checks: posterior `theta`, `u`, and `eta` all have shape
+  `(10000,4)`; saved `mu_u` has shape `(4,)`; saved `cov_u` has shape
+  `(4,4)`; all decomposition components are finite; covariance components
+  are nonnegative within tolerance.
+- Comparison to empirical seed-88 x=50 calibration/reuse:
+  empirical-GNK `Delta_N,u=2.074183110746632`, with mean component
+  `0.46664382486125144` and covariance component `1.6075392858853803`.
+
+Interpretation: the model-control pilot does not show a collapse of the
+finite-`N` residual when the NPE training simulator is changed to the same
+asymptotic MVN summary likelihood used by the NUTS reference. For this seed and
+budget, the residual remains close to the empirical-GNK seed-88 residual and is
+again mostly covariance. This strengthens the finite-`N`/amortisation-residual
+interpretation, while remaining a single-seed diagnostic rather than
+paper-facing aggregate evidence.
 
 First HPC attempt:
 
@@ -213,14 +299,16 @@ First HPC attempt:
 
 ## 2026-04-26 Plan Refresh
 
-Status: administrative update only; no new computation.
+Status: administrative update only; no new computation. This planning note is
+now superseded by the completed-only high-budget evaluation section below for
+the current empirical-GNK status.
 
-The weekend plan has been narrowed based on the completed n=500 oracle gate and
-the completed empirical-GNK x=50 seed-88 calibration. Priorities 1-5 are
-complete. The old high-budget priority is now split into:
+The weekend plan was narrowed based on the completed n=500 oracle gate and
+the completed empirical-GNK x=50 seed-88 calibration. Priorities 1-5 were
+complete at that point. The old high-budget priority was split into:
 
-- 6a: evaluate the completed empirical-GNK calibration output through the reviewed u-space decomposition.
-- 6b: if 6a passes, prepare a bounded high-budget dry-run for empirical-GNK Gaussian-NPE with n=500, x in {25,50}, seeds 0:100.
+- 6a: evaluate the completed empirical-GNK calibration output through the reviewed u-space decomposition. This is now completed.
+- 6b: prepare and evaluate a bounded high-budget run for empirical-GNK Gaussian-NPE with n=500, x in {25,50}, seeds 0:100. This is now completed-only, with x=50 incomplete.
 
 The remaining gate before array preparation is operational correctness, not
 scientific success: required files must exist, the calibration output schema
@@ -237,10 +325,45 @@ Explicit blocks until further review:
 - no mutation of the worktree used by any running `gnk_model` PBS job;
 - no paper-framing changes by agents.
 
-The next intended bounded-array namespace is `res/gnk_high_budget/`, with a
-dry-run table recording one row per intended job and an explicit reuse or
-exclusion record for x=50 seed=88. Ryan should review the dry-run before any
-array submission.
+The bounded-array namespace was subsequently prepared and evaluated under
+`res/gnk_high_budget/`. See the completed-only high-budget evaluation section
+below for current paths, seed counts, and interpretation.
+
+## GNK High-Budget Completed-Only u-Space Evaluation
+
+Status: completed-only evaluation finished; `x=25` is complete over 101 seeds
+and `x=50` is an incomplete diagnostic over 89 usable seeds.
+
+- Full command: `MPLCONFIGDIR=/tmp/codex_mpl python scripts/evaluate_gnk_high_budget_u_space.py`
+- Subset check command: `python scripts/evaluate_gnk_high_budget_u_space.py --only 25:0,50:88 --output-prefix gnk_high_budget_u_space_decomp_subset_20260430T000000Z`
+- Created at: `2026-04-29T21:57:56.681547+00:00`.
+- Run-time commit hash: `8ee5bb2`; the worktree was dirty at runtime because of pre-existing local changes plus current generated/evaluation artifacts.
+- Reviewed decomposition convention: `scripts/compute_gnk_u_space_kl_decomp.py`.
+- Audit source of truth: `res/gnk_high_budget/post_run_audit_20260429T214347Z.json`.
+- Existing reviewed comparison CSV for scaled-budget plot: `notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv`.
+- Output paths:
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_per_seed.csv`
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_group_summary.csv`
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_summary.json`
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_delta_u_components.pdf`
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_scaled_budget_with_existing.pdf`
+  - `res/gnk_high_budget/evaluation/gnk_high_budget_u_space_decomp_20260429T215756Z_plot_metadata.json`
+- Evaluated rows: 190 total, consisting of 189 complete rows plus the reused `x=50, seed=88` calibration row. Failed `x=50` seeds excluded: `19, 20, 21, 22, 24, 25, 26, 29, 31, 32, 36, 37`.
+- Schema/numerical checks: every evaluated row has `posterior_samples_10k.npz` arrays `theta`, `u`, and `eta` with shape `(10000,4)`, `gaussian_npe_u_posterior.npz` arrays `mu_u` shape `(4,)` and `cov_u` shape `(4,4)`, finite decomposition components, and nonnegative covariance components within tolerance. All operational gates passed.
+- `x=25`, 101 usable seeds, complete theorem-facing high-budget evidence:
+  - `K_theta^*` median/IQR: `0.09953467525483438` [`0.07733205887230875`, `0.13519703860054702`].
+  - `Delta_N,u` median/IQR: `2.0627254994189657` [`1.8601144381621082`, `2.5784661129163173`].
+  - component medians: mean `0.4038665248530899`, covariance `1.6878831023042586`.
+- `x=50`, 89 usable seeds, incomplete diagnostic:
+  - usable rows are 88 complete new rows plus reused seed `88`; the reused row is explicitly marked in the per-seed CSV.
+  - `K_theta^*` median/IQR: `0.09776307376411902` [`0.07733205887230875`, `0.13018985526584267`].
+  - `Delta_N,u` median/IQR: `1.9739450046983793` [`1.73168926995879`, `2.2968437903681806`].
+  - component medians: mean `0.36830516484538106`, covariance `1.5787880491346193`.
+- Direct saved-Gaussian reconstruction diagnostics are close to the saved-sample moment convention: median KL from sample-moment `Qhat` to direct saved Gaussian is `0.0006664453902312` for `x=25` and `0.0006539586360662674` for usable `x=50`.
+- Runtime medians from completed/reused rows: `x=25` wall time `14647.253670178005` seconds and peak RSS `1565204` KB; usable `x=50` wall time `23369.60023357009` seconds and peak RSS `1808728` KB.
+- Plot metadata records the command, commit hash, input/output paths, seed counts, and that the scaled-budget plot uses the 12 historical reviewed complete groups (`N>n`, at least 101 seeds) plus the two high-budget groups.
+- Cache access: read-only for NUTS caches and high-budget/calibration outputs; no cache files were overwritten.
+- Neutral interpretation: `Delta_N,u = KL(G_u^* || Qhat_N,u)` is the native u-space Gaussian-NPE diagnostic, not a pure BvM residual. `K_theta^*` remains the theta-space BvM-premise diagnostic. The complete `x=25` group is theorem-facing high-budget evidence; the usable `x=50` group should remain labelled incomplete/diagnostic unless the 12 failed seeds are rerun.
 
 ## Hexadecile Aggregation
 

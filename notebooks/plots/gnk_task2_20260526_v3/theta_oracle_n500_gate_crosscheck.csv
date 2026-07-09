@@ -1,0 +1,2 @@
+n,u_space_source,gate_source,matched_seed_count,max_abs_K_theta_star_difference,u_space_K_theta_star_median,gate_K_theta_star_median
+500,notebooks/plots/gnk_u_space_kl_decomp_20260425_per_seed.csv,notebooks/plots/gnk_n500_oracle_gate_20260425_per_seed.csv,101,3.071140258530114e-05,0.0995346752548343,0.0995328824074164

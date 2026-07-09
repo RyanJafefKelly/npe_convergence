@@ -21,6 +21,12 @@ import optax
 from jaxtyping import Array, Float, PRNGKeyArray
 
 
+def _static_field():
+    if hasattr(eqx, "field"):
+        return eqx.field(static=True)
+    return eqx.static_field()
+
+
 # ---------------------------------------------------------------------------
 # Model
 # ---------------------------------------------------------------------------
@@ -36,7 +42,7 @@ class ConditionalGaussianNPE(eqx.Module):
     _shared: list
     _mu_head: eqx.nn.Linear
     _chol_head: eqx.nn.Linear
-    d_theta: int = eqx.field(static=True)
+    d_theta: int = _static_field()
 
     def __init__(
         self,

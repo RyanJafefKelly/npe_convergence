@@ -1,0 +1,10 @@
+cache_record_count: 3329
+group_count: 33
+inventory_rows: 33
+coverage_rows: 96
+bias_boxplot_rows: 8808
+bias_summary_rows: 96
+posterior_mean_bias_rows: 4431
+overlay_manifest_rows: 9
+overlay_sample_rows: 138000
+overlay_density_rows: 6000

@@ -664,6 +664,10 @@ def _training_tree_path(base: Path, method: str, name: str) -> Path:
     return base / "training" / f"{method}_{name}.eqx"
 
 
+def _training_aux_pickle_path(base: Path, method: str, name: str) -> Path:
+    return base / "training" / f"{method}_{name}.pkl"
+
+
 def _training_complete_path(base: Path, method: str) -> Path:
     return base / "training" / f"{method}_complete.json"
 
@@ -673,15 +677,32 @@ def _save_training_state(base: Path, method: str, state: dict[str, Any]) -> None
     if method == "flow_npe":
         save_equinox_tree(_training_tree_path(base, method, "model"), state["model"])
         save_equinox_tree(_training_tree_path(base, method, "best_model"), state["best_model"])
-        save_equinox_tree(_training_tree_path(base, method, "opt_state"), state["opt_state"])
+        opt_state_path = _training_tree_path(base, method, "opt_state")
+        opt_state_saved = False
+        try:
+            save_equinox_tree(opt_state_path, state["opt_state"])
+            opt_state_saved = True
+        except Exception as exc:
+            log_event(
+                base,
+                "train",
+                "opt-state-save-skipped",
+                path=opt_state_path,
+                format="equinox",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                epoch=state.get("epoch"),
+            )
         payload.pop("model", None)
         payload.pop("best_model", None)
         payload.pop("opt_state", None)
         payload["tree_checkpoints"] = {
             "model": _training_tree_path(base, method, "model").name,
             "best_model": _training_tree_path(base, method, "best_model").name,
-            "opt_state": _training_tree_path(base, method, "opt_state").name,
         }
+        if opt_state_saved:
+            payload["tree_checkpoints"]["opt_state"] = opt_state_path.name
+            payload["tree_checkpoints"]["opt_state_format"] = "equinox"
     save_pickle(_training_state_path(base, method), payload)
     write_json(
         base / "training" / f"{method}_losses.json",
@@ -693,6 +714,56 @@ def _save_training_state(base: Path, method: str, state: dict[str, Any]) -> None
             "losses": state["losses"],
         },
     )
+
+
+def _load_flow_opt_state(
+    args: argparse.Namespace,
+    base: Path,
+    state: dict[str, Any],
+    opt_template: Any,
+) -> Any:
+    pickle_path = _training_aux_pickle_path(base, args.method, "opt_state")
+    if pickle_path.exists():
+        try:
+            return load_pickle(pickle_path)
+        except Exception as exc:
+            log_event(
+                base,
+                "train",
+                "opt-state-load-failed",
+                path=pickle_path,
+                format="pickle",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                epoch=state.get("epoch"),
+            )
+
+    legacy_path = _training_tree_path(base, args.method, "opt_state")
+    if legacy_path.exists():
+        try:
+            return load_equinox_tree(legacy_path, opt_template)
+        except Exception as exc:
+            log_event(
+                base,
+                "train",
+                "opt-state-load-failed",
+                path=legacy_path,
+                format="equinox",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                epoch=state.get("epoch"),
+            )
+
+    log_event(
+        base,
+        "train",
+        "opt-state-reinitialized",
+        method=args.method,
+        epoch=state.get("epoch"),
+        best_epoch=state.get("best_epoch"),
+        best_val_loss=state.get("best_val_loss"),
+    )
+    return opt_template
 
 
 def _flow_template_from_state(state: dict[str, Any]) -> Any:
@@ -729,7 +800,7 @@ def _load_training_state(args: argparse.Namespace, base: Path, data: dict[str, n
     )
     init_opt_state, _, _ = _make_train_fns(args.method, float(state["config"]["learning_rate"]))
     opt_template = init_opt_state(state["model"])
-    state["opt_state"] = load_equinox_tree(_training_tree_path(base, args.method, "opt_state"), opt_template)
+    state["opt_state"] = _load_flow_opt_state(args, base, state, opt_template)
     return state
 
 

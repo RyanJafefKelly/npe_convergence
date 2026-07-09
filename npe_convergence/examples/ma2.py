@@ -68,25 +68,31 @@ def autocov(x, lag=1):
     return C
 
 
-def get_summaries(x):
-    """Compute summaries: variance and autocovariances at lags 1 and 2.
+def get_summaries(x, max_lag=2):
+    """Compute summaries: variance and autocovariances through ``max_lag``.
 
     Parameters
     ----------
     x : jnp.array of shape (n_samples, n_obs)
+    max_lag : int, optional
+        Largest autocovariance lag. The default ``2`` preserves the legacy
+        three-summary output ``[gamma0, acov1, acov2]``.
 
     Returns
     -------
-    summaries : jnp.array of shape (n_samples, 3)
+    summaries : jnp.array of shape (n_samples, max_lag + 1)
     """
+    if max_lag < 0:
+        raise ValueError("max_lag must be non-negative")
     gamma0 = jnp.mean(x ** 2, axis=1)  # (1/n) * sum X_t^2; no mean subtraction
-    acov1 = autocov(x, lag=1)
-    acov2 = autocov(x, lag=2)
-    summaries = jnp.stack((gamma0, acov1, acov2), axis=1)
+    values = [gamma0]
+    for lag in range(1, max_lag + 1):
+        values.append(autocov(x, lag=lag))
+    summaries = jnp.stack(values, axis=1)
     return summaries
 
 
-def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size):
+def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size, max_lag=2):
     """Process simulations in batches to save memory.
 
     Parameters
@@ -103,10 +109,13 @@ def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size):
         Total number of simulations.
     batch_size : int
         Number of simulations per batch.
+    max_lag : int, optional
+        Largest autocovariance lag. The default ``2`` preserves the legacy
+        output shape.
 
     Returns
     -------
-    all_summaries : jnp.array of shape (n_sims, 3)
+    all_summaries : jnp.array of shape (n_sims, max_lag + 1)
         Summaries for all simulations.
     """
     num_batches = n_sims // batch_size + (n_sims % batch_size != 0)
@@ -125,7 +134,7 @@ def get_summaries_batches(key, t1, t2, n_obs, n_sims, batch_size):
         sim_data_batch = MA2(t1_batch, t2_batch, n_obs=n_obs, batch_size=batch_size_i, key=sub_key)
 
         # Compute summaries for the batch
-        sim_summ_data_batch = get_summaries(sim_data_batch)
+        sim_summ_data_batch = get_summaries(sim_data_batch, max_lag=max_lag)
 
         # Collect summaries
         all_summaries.append(sim_summ_data_batch)

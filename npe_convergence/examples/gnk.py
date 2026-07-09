@@ -13,26 +13,39 @@ from numpyro.infer import MCMC, NUTS  # type: ignore
 # @jit
 def gnk(z, A, B, g, k, c=0.8):
     """Quantile function for the g-and-k distribution."""
-    return A + B * (1 + c * jnp.tanh(g * z / 2)) * (1 + z**2)**k * z
+    return A + B * (1 + c * jnp.tanh(g * z / 2)) * (1 + z**2) ** k * z
+
+
+def ss_even_quantiles(y, d_s: int):
+    """Calculate evenly spaced quantiles of the input data."""
+    quantiles = jnp.linspace(100 / (d_s + 1), 100 * d_s / (d_s + 1), d_s)
+    return jnp.percentile(y, quantiles, axis=-1)
+
+
+def ss_sextile(y):
+    """Calculate sextiles of the input data."""
+    return ss_even_quantiles(y, 5)
 
 
 # @jit
 def ss_octile(y):
     """Calculate octiles of the input data."""
-    octiles = jnp.linspace(12.5, 87.5, 7)
-    return jnp.percentile(y, octiles, axis=-1)
+    return ss_even_quantiles(y, 7)
 
 
 def ss_duodecile(y):
-    """Calculate octiles of the input data."""
-    duodeciles = jnp.linspace(8.33, 91.67, 11)
-    return jnp.percentile(y, duodeciles, axis=-1)
+    """Calculate duodeciles of the input data."""
+    return ss_even_quantiles(y, 11)
 
 
 def ss_hexadeciles(y):
     """Calculate hexadeciles of the input data."""
-    hexadeciles = jnp.linspace(6.25, 93.75, 15)
-    return jnp.percentile(y, hexadeciles, axis=-1)
+    return ss_even_quantiles(y, 15)
+
+
+def ss_vigintile(y):
+    """Calculate vigintiles of the input data."""
+    return ss_even_quantiles(y, 19)
 
 
 def gnk_density(x, A, B, g, k, c=0.8):
@@ -64,10 +77,10 @@ def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size, sum_fn=Non
 
         z_batch = random.normal(sub_key, shape=(n_obs, batch_size_i))
 
-        A_batch = A[i * batch_size: i * batch_size + batch_size_i]
-        B_batch = B[i * batch_size: i * batch_size + batch_size_i]
-        g_batch = g[i * batch_size: i * batch_size + batch_size_i]
-        k_batch = k[i * batch_size: i * batch_size + batch_size_i]
+        A_batch = A[i * batch_size : i * batch_size + batch_size_i]
+        B_batch = B[i * batch_size : i * batch_size + batch_size_i]
+        g_batch = g[i * batch_size : i * batch_size + batch_size_i]
+        k_batch = k[i * batch_size : i * batch_size + batch_size_i]
 
         x_batch = gnk(z_batch, A_batch, B_batch, g_batch, k_batch)
         x_batch = x_batch.T
@@ -81,10 +94,10 @@ def get_summaries_batches(key, A, B, g, k, n_obs, n_sims, batch_size, sum_fn=Non
 def gnk_deriv(z, A, B, g, k, c):
     """Calculate the derivative of the g-and-k quantile function."""
     z_squared = z**2
-    term1 = (1 + z_squared)**k
+    term1 = (1 + z_squared) ** k
     term2 = 1 + c * jnp.tanh(g * z / 2)
     term3 = (1 + (2 * k + 1) * z_squared) / (1 + z_squared)
-    term4 = c * g * z / (2 * jnp.cosh(g * z / 2)**2)
+    term4 = c * g * z / (2 * jnp.cosh(g * z / 2) ** 2)
 
     term2 = jnp.where(g == 0, 1.0, term2)
     term4 = jnp.where(g == 0, 0.0, term4)
@@ -97,6 +110,7 @@ def gnk_deriv(z, A, B, g, k, c):
 
 def pgk(q, A, B, g, k, c=0.8, zscale=False):
     """Inverse of the g-and-k quantile function."""
+
     def toroot(p):
         return z2gk(p, A, B, g, k, c) - q
 
@@ -106,7 +120,7 @@ def pgk(q, A, B, g, k, c=0.8, zscale=False):
 
 def z2gk(p, A, B, g, k, c=0.8):
     """G-and-k quantile function."""
-    return A + B * ((1 + c * jnp.tanh(g * p / 2)) * ((1 + p**2)**k) * p)
+    return A + B * ((1 + c * jnp.tanh(g * p / 2)) * ((1 + p**2) ** k) * p)
 
 
 def bisection_method(f, a, b, tol=1e-5, max_iter=100):
@@ -133,9 +147,7 @@ def bisection_method(f, a, b, tol=1e-5, max_iter=100):
 
     init_state = (a, b, fa, False)
     final_state = lax.while_loop(
-        lambda state: jnp.logical_not(state[3]),
-        body_fun,
-        init_state
+        lambda state: jnp.logical_not(state[3]), body_fun, init_state
     )
 
     return (final_state[0] + final_state[1]) / 2
@@ -145,8 +157,8 @@ def sample_var_fn(p, A, B, g, k, n_obs):
     """Calculate the variance of an order statistic."""
     numerator = p * (1 - p)
     gnk_dens = gnk_density(gnk(norm.ppf(p), A, B, g, k), A, B, g, k)
-    denominator = n_obs * gnk_dens ** 2
-    res = numerator/denominator
+    denominator = n_obs * gnk_dens**2
+    res = numerator / denominator
     return res
 
 
@@ -163,7 +175,7 @@ def compute_covariance_matrix(A, B, g, k, quantiles, n_obs, c=0.8):
         p_i = quantiles[i]
         f_i = f_x[i]
 
-        var_i = p_i * (1 - p_i) / (n_obs * f_i ** 2)
+        var_i = p_i * (1 - p_i) / (n_obs * f_i**2)
         cov_matrix = cov_matrix.at[i, i].set(var_i)
 
         for j in range(i + 1, m):
@@ -177,13 +189,13 @@ def compute_covariance_matrix(A, B, g, k, quantiles, n_obs, c=0.8):
     return cov_matrix
 
 
-def gnk_model(obs, n_obs):
+def gnk_model(obs, n_obs) -> None:
     """Model for the g-and-k distribution using Numpyro with a multivariate normal."""
     # Sample parameters
-    A = numpyro.sample('A', dist.Uniform(0, 10))
-    B = numpyro.sample('B', dist.Uniform(0, 10))
-    g = numpyro.sample('g', dist.Uniform(0, 10))
-    k = numpyro.sample('k', dist.Uniform(0, 10))
+    A = numpyro.sample("A", dist.Uniform(0, 10))
+    B = numpyro.sample("B", dist.Uniform(0, 10))
+    g = numpyro.sample("g", dist.Uniform(0, 10))
+    k = numpyro.sample("k", dist.Uniform(0, 10))
 
     quantile_length = 1 / (len(obs) + 1)
     quantiles = jnp.linspace(quantile_length, 1 - quantile_length, len(obs))
@@ -195,7 +207,9 @@ def gnk_model(obs, n_obs):
     jitter = 1e-6
     cov_matrix += jitter * jnp.eye(len(obs))
 
-    numpyro.sample('obs', dist.MultivariateNormal(expected_summaries, cov_matrix), obs=obs)
+    numpyro.sample(
+        "obs", dist.MultivariateNormal(expected_summaries, cov_matrix), obs=obs
+    )
 
 
 # def gnk_model(obs, n_obs):
@@ -221,10 +235,10 @@ def gnk_model(obs, n_obs):
 
 def gnk_model_narrow_prior(obs, n_obs):
     """Model for the g-and-k distribution using Numpyro."""
-    A = numpyro.sample('A', dist.Uniform(0, 5))
-    B = numpyro.sample('B', dist.Uniform(0, 5))
-    g = numpyro.sample('g', dist.Uniform(0, 5))
-    k = numpyro.sample('k', dist.Uniform(0, 5))
+    A = numpyro.sample("A", dist.Uniform(0, 5))
+    B = numpyro.sample("B", dist.Uniform(0, 5))
+    g = numpyro.sample("g", dist.Uniform(0, 5))
+    k = numpyro.sample("k", dist.Uniform(0, 5))
 
     octiles = jnp.linspace(12.5, 87.5, 7) / 100
     norm_quantiles = norm.ppf(octiles)
@@ -232,10 +246,11 @@ def gnk_model_narrow_prior(obs, n_obs):
 
     y_variance = [sample_var_fn(p, A, B, g, k, n_obs) for p in octiles]
     for i in range(len(obs)):
-        numpyro.sample(f'y_{i}',
-                       dist.Normal(expected_summaries[i],
-                                   jnp.sqrt(y_variance[i])),
-                       obs=obs[i])
+        numpyro.sample(
+            f"y_{i}",
+            dist.Normal(expected_summaries[i], jnp.sqrt(y_variance[i])),
+            obs=obs[i],
+        )
 
 
 def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
@@ -245,16 +260,17 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     thinning = 10
     num_chains = 4
 
-    mcmc = MCMC(kernel,
-                num_warmup=num_warmup,
-                num_samples=num_samples*thinning // num_chains,
-                thinning=thinning,
-                num_chains=num_chains,
-                )
+    mcmc = MCMC(
+        kernel,
+        num_warmup=num_warmup,
+        num_samples=num_samples * thinning // num_chains,
+        thinning=thinning,
+        num_chains=num_chains,
+    )
 
     # NOTE: need to transform initial parameters to unbounded space
     def init_param_to_unbounded(value, num_chains, subkey):
-        param_arr = jnp.repeat(logit(jnp.array([value])/10), num_chains)
+        param_arr = jnp.repeat(logit(jnp.array([value]) / 10), num_chains)
         noise = random.normal(subkey, (num_chains,)) * 0.05
 
         return param_arr + noise
@@ -262,16 +278,13 @@ def run_nuts(seed, obs, n_obs, num_samples=10_000, num_warmup=10_000):
     rng_key, *subkeys = random.split(rng_key, 5)
 
     init_params = {
-        'A': init_param_to_unbounded(3.0, num_chains, subkeys[0]),
-        'B': init_param_to_unbounded(1.0, num_chains, subkeys[1]),
-        'g': init_param_to_unbounded(2.0, num_chains, subkeys[2]),
-        'k': init_param_to_unbounded(0.5, num_chains, subkeys[3])
+        "A": init_param_to_unbounded(3.0, num_chains, subkeys[0]),
+        "B": init_param_to_unbounded(1.0, num_chains, subkeys[1]),
+        "g": init_param_to_unbounded(2.0, num_chains, subkeys[2]),
+        "k": init_param_to_unbounded(0.5, num_chains, subkeys[3]),
     }
 
-    mcmc.run(rng_key=rng_key,
-             init_params=init_params,
-             obs=obs,
-             n_obs=n_obs)
+    mcmc.run(rng_key=rng_key, init_params=init_params, obs=obs, n_obs=n_obs)
 
     return mcmc
 
@@ -283,16 +296,17 @@ def run_nuts_narrow_prior(seed, obs, n_obs, num_samples=10_000, num_warmup=10_00
     thinning = 10
     num_chains = 4
 
-    mcmc = MCMC(kernel,
-                num_warmup=num_warmup,
-                num_samples=num_samples*thinning // num_chains,
-                thinning=thinning,
-                num_chains=num_chains,
-                )
+    mcmc = MCMC(
+        kernel,
+        num_warmup=num_warmup,
+        num_samples=num_samples * thinning // num_chains,
+        thinning=thinning,
+        num_chains=num_chains,
+    )
 
     # NOTE: need to transform initial parameters to unbounded space
     def init_param_to_unbounded(value, num_chains, subkey):
-        param_arr = jnp.repeat(logit(jnp.array([value])/5), num_chains)
+        param_arr = jnp.repeat(logit(jnp.array([value]) / 5), num_chains)
         noise = random.normal(subkey, (num_chains,)) * 0.05
 
         return param_arr + noise
@@ -300,16 +314,13 @@ def run_nuts_narrow_prior(seed, obs, n_obs, num_samples=10_000, num_warmup=10_00
     rng_key, *subkeys = random.split(rng_key, 5)
 
     init_params = {
-        'A': init_param_to_unbounded(3.0, num_chains, subkeys[0]),
-        'B': init_param_to_unbounded(1.0, num_chains, subkeys[1]),
-        'g': init_param_to_unbounded(2.0, num_chains, subkeys[2]),
-        'k': init_param_to_unbounded(0.5, num_chains, subkeys[3])
+        "A": init_param_to_unbounded(3.0, num_chains, subkeys[0]),
+        "B": init_param_to_unbounded(1.0, num_chains, subkeys[1]),
+        "g": init_param_to_unbounded(2.0, num_chains, subkeys[2]),
+        "k": init_param_to_unbounded(0.5, num_chains, subkeys[3]),
     }
 
-    mcmc.run(rng_key=rng_key,
-             init_params=init_params,
-             obs=obs,
-             n_obs=n_obs)
+    mcmc.run(rng_key=rng_key, init_params=init_params, obs=obs, n_obs=n_obs)
 
     return mcmc
 
@@ -322,8 +333,9 @@ def ss_robust(y):
     ss_k = _get_ss_k(y)
 
     # Combine the summary statistics, (batch should be first dim)
-    ss_robust = jnp.concatenate([ss_A[:, None], ss_B[:, None],
-                                 ss_g[:, None], ss_k[:, None]], axis=1)
+    ss_robust = jnp.concatenate(
+        [ss_A[:, None], ss_B[:, None], ss_g[:, None], ss_k[:, None]], axis=1
+    )
     return jnp.squeeze(ss_robust)
 
 
@@ -352,8 +364,7 @@ def _get_ss_g(y):
 
 def _get_ss_k(y):
     """Compute a kurtosis-like summary statistic."""
-    E1, E3, E5, E7 = jnp.percentile(y, jnp.array([12.5, 37.5, 62.5, 87.5]),
-                                    axis=1)
+    E1, E3, E5, E7 = jnp.percentile(y, jnp.array([12.5, 37.5, 62.5, 87.5]), axis=1)
     ss_B = _get_ss_B(y).flatten()
     ss_k = (E7 - E5 + E3 - E1) / ss_B
     return ss_k[:, None]
