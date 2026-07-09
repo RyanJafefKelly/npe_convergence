@@ -65,3 +65,26 @@ cp "$M"/gnk_kl_flow_vs_gaussian.csv "$M"/gnk_kl_paired_per_seed.csv \
    "$M"/dim_scaling_pilot_kl_by_d.csv "$D"/
 cp "$T"/coverage_paper_grid_all_params.csv "$T"/bias_g_paper_figure_values.csv "$D"/
 ```
+
+## Added 2026-07-09 (salvaged June overnight results)
+
+Three CSVs staged by the aggregation scripts on the HPC login node on
+2026-07-09, from cell arrays that completed 2026-06-02/03:
+
+- `ma2_dim_scaling_n1000.csv`: MA(2) dimension-scaling c-sweep at n_obs=1000,
+  240/240 cells. Produced by `npe_convergence/scripts/run_ma2_dim_scaling.py
+  aggregate-overnight` in HPC worktree `npe_convergence_dim_scaling_20260601`.
+  Raw tree: `res/overnight_20260601/dim_scaling/ma2_n1000`.
+- `gnk_dim_scaling_n1000_csweep.csv`: GNK dimension-scaling c-sweep at
+  n_obs=1000, 197/208 cells (11 failures at d in {19,23}, c=20). Same worktree,
+  `run_gnk_dim_scaling.py aggregate-overnight`. Raw tree:
+  `res/overnight_20260601/dim_scaling/gnk_n1000`.
+- `gnk_gaussian_robust_n1000.csv`: GNK NPE-gap robust-standardisation
+  diagnostic, 178/180 cells. Produced by
+  `scripts/aggregate_gnk_npe_gap_20260601.py` in HPC worktree
+  `npe_convergence_3p2_npe_gap_20260601`. Raw tree:
+  `res/overnight_20260601/npe_gap/gnk_gaussian_robust_n1000`.
+
+Verdicts and summary tables: `docs/coauthor_report_2026_05_31/
+codex_outcome_3p3_dim_scaling_2026_06_01.md` and
+`codex_outcome_3p2_npe_gap_2026_06_01.md` (Analysis Status sections).
